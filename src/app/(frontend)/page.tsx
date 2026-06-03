@@ -19,10 +19,7 @@ export default async function Home() {
       depth: 0,
     })
     for (const post of allPosts.docs) {
-      if (
-        post.slug !== 'cho-z-kenh-d2c-tu-goc-den-nguoi-dung' &&
-        post.title !== 'Chợ Z - kênh D2C từ gốc đến người dùng'
-      ) {
+      if (post.slug !== 'cho-z-kenh-d2c-tu-goc-den-nguoi-dung') {
         await payload.delete({
           collection: 'posts',
           id: post.id,
