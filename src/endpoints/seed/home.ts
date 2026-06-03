@@ -47,7 +47,7 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
                   format: 0,
                   mode: 'normal',
                   style: '',
-                  text: 'Payload Website Template',
+                  text: 'Chợ Z - Kênh phân phối D2C & Mạng lưới Trạm giao dịch',
                   version: 1,
                 },
               ],
@@ -666,9 +666,9 @@ export const home: (args: HomeArgs) => RequiredDataFromCollectionSlug<'pages'> =
       },
     ],
     meta: {
-      description: 'An open-source website built with Payload and Next.js.',
+      description: 'Mô hình Tổng kho - Kho khu vực - Trạm giao dịch trung bình mỗi 500-600m giúp gom đơn, giao nhận tinh gọn và tối ưu chi phí trung gian. Kênh phân phối D2C và mạng lưới Trạm giao dịch.',
       image: heroImage.id,
-      title: 'Payload Website Template',
+      title: 'Chợ Z - Kênh phân phối D2C & Mạng lưới Trạm giao dịch',
     },
     title: 'Home',
   }

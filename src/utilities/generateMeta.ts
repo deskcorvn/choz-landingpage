@@ -8,12 +8,16 @@ import { getServerSideURL } from './getURL'
 const getImageURL = (image?: Media | Config['db']['defaultIDType'] | null) => {
   const serverUrl = getServerSideURL()
 
-  let url = serverUrl + '/website-template-OG.webp'
+  let url = serverUrl + '/choz-og.png'
 
   if (image && typeof image === 'object' && 'url' in image) {
     const ogUrl = image.sizes?.og?.url
 
     url = ogUrl ? serverUrl + ogUrl : serverUrl + image.url
+  }
+
+  if (url.includes('website-template-OG.webp')) {
+    url = serverUrl + '/choz-og.png'
   }
 
   return url
@@ -26,14 +30,28 @@ export const generateMeta = async (args: {
 
   const ogImage = getImageURL(doc?.meta?.image)
 
-  const title = doc?.meta?.title
-    ? doc?.meta?.title + ' | Payload Website Template'
-    : 'Payload Website Template'
+  let docTitle = doc?.meta?.title
+  if (docTitle === 'Payload Website Template') {
+    docTitle = undefined
+  }
+
+  let docDescription = doc?.meta?.description
+  if (
+    !docDescription ||
+    docDescription === 'An open-source website built with Payload and Next.js.'
+  ) {
+    docDescription =
+      'Mô hình Tổng kho - Kho khu vực - Trạm giao dịch trung bình mỗi 500-600m giúp gom đơn, giao nhận tinh gọn và tối ưu chi phí trung gian. Kênh phân phối D2C và mạng lưới Trạm giao dịch.'
+  }
+
+  const title = docTitle
+    ? docTitle + ' | Chợ Z'
+    : 'Chợ Z - Kênh phân phối D2C & Mạng lưới Trạm giao dịch'
 
   return {
-    description: doc?.meta?.description,
+    description: docDescription,
     openGraph: mergeOpenGraph({
-      description: doc?.meta?.description || '',
+      description: docDescription,
       images: ogImage
         ? [
             {
