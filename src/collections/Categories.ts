@@ -3,7 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { anyone } from '../access/anyone'
 import { authenticated } from '../access/authenticated'
 import { slugField } from 'payload'
-import { formatSlug } from '../utilities/formatSlug'
+import { customSlugify } from '../utilities/formatSlug'
 
 export const Categories: CollectionConfig = {
   slug: 'categories',
@@ -23,11 +23,7 @@ export const Categories: CollectionConfig = {
       required: true,
     },
     slugField({
-      overrides: {
-        hooks: {
-          beforeValidate: [formatSlug('title')],
-        },
-      },
+      slugify: customSlugify,
       position: undefined,
     }),
   ],
