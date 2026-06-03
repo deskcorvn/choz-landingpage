@@ -10,6 +10,29 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const payload = await getPayload({ config: configPromise })
+
+  // Automatically delete old mock/seeded posts from database
+  try {
+    const allPosts = await payload.find({
+      collection: 'posts',
+      limit: 100,
+      depth: 0,
+    })
+    for (const post of allPosts.docs) {
+      if (
+        post.slug !== 'cho-z-kenh-d2c-tu-goc-den-nguoi-dung' &&
+        post.title !== 'Chợ Z - kênh D2C từ gốc đến người dùng'
+      ) {
+        await payload.delete({
+          collection: 'posts',
+          id: post.id,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('Failed to clean up old posts:', err)
+  }
+
   const posts = await payload.find({
     collection: 'posts',
     limit: 3,
