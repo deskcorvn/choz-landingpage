@@ -6,9 +6,9 @@ import { MotionItem, MotionReveal, MotionStagger } from './ZStationMotion';
 import { blogPosts } from './z-station-data';
 
 const staticFallbacks = [
-	'/images/miniapp/blog-crm-du-lich.jpg',
-	'/images/miniapp/blog-spa-process.jpg',
-	'/images/miniapp/blog-spa-phone.jpg',
+	'/choz-og.png',
+	'/choz-og.png',
+	'/choz-og.png',
 ];
 
 export default function ZStationBlogSection({ posts }: { posts?: Post[] }) {

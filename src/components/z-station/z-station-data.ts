@@ -116,15 +116,15 @@ export const testimonials = [
 
 export const blogPosts = [
 	{
-		image: '/images/miniapp/blog-crm-du-lich.jpg',
+		image: '/choz-og.png',
 		title: 'Chợ Z là gì? Kênh phân phối D2C từ nhà cung cấp gốc đến người dùng',
 	},
 	{
-		image: '/images/miniapp/blog-spa-process.jpg',
+		image: '/choz-og.png',
 		title: 'Trạm Z vận hành ra sao trong mạng lưới tổng kho và kho khu vực',
 	},
 	{
-		image: '/images/miniapp/blog-spa-phone.jpg',
+		image: '/choz-og.png',
 		title: 'Kiểu Z là gì: lối đi riêng để tạo giá trị xã hội mới mẻ',
 	},
 ];
