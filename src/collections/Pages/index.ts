@@ -12,6 +12,7 @@ import { slugField } from 'payload'
 import { populatePublishedAt } from '../../hooks/populatePublishedAt'
 import { generatePreviewPath } from '../../utilities/generatePreviewPath'
 import { revalidateDelete, revalidatePage } from './hooks/revalidatePage'
+import { formatSlug } from '../../utilities/formatSlug'
 
 import {
   MetaDescriptionField,
@@ -117,7 +118,13 @@ export const Pages: CollectionConfig<'pages'> = {
         position: 'sidebar',
       },
     },
-    slugField(),
+    slugField({
+      overrides: {
+        hooks: {
+          beforeValidate: [formatSlug('title')],
+        },
+      },
+    }),
   ],
   hooks: {
     afterChange: [revalidatePage],

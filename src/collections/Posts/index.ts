@@ -26,6 +26,7 @@ import {
   PreviewField,
 } from '@payloadcms/plugin-seo/fields'
 import { slugField } from 'payload'
+import { formatSlug } from '../../utilities/formatSlug'
 
 export const Posts: CollectionConfig<'posts'> = {
   slug: 'posts',
@@ -214,7 +215,13 @@ export const Posts: CollectionConfig<'posts'> = {
         },
       ],
     },
-    slugField(),
+    slugField({
+      overrides: {
+        hooks: {
+          beforeValidate: [formatSlug('title')],
+        },
+      },
+    }),
   ],
   hooks: {
     afterChange: [revalidatePost],
