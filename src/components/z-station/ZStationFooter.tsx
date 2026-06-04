@@ -59,7 +59,7 @@ export default function ZStationFooter() {
 			<div
 				className='miniapp-container mt-10 border-t border-red-100 pt-6 text-center text-[13px] text-[#9ca3af] sm:mt-12 sm:pt-7'
 			>
-				© 2026 Chợ Z. SINHTIN Co., LTD.
+				© 2026 Chợ Z. SINHTIN & GIFTYTECH.
 			</div>
 		</footer>
 	);
