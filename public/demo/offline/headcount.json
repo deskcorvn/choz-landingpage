@@ -1,5 +1,5 @@
 {
- "mode": "mock",
+ "mode": "live",
  "per_tram_day": {
   "volumes": {
    "baskets": 30,
@@ -228,10 +228,10 @@
    "note": "tay chân: cùng số phút ở hai bên, agent không thay"
   },
   "agents": 6,
-  "agent_cost_vnd_day": 0,
-  "agent_cost_vnd_month": 0,
-  "agent_cost_usd_month": 0.0,
-  "agent_cost_vnd_per_order": 0,
+  "agent_cost_vnd_day": 10034,
+  "agent_cost_vnd_month": 260884,
+  "agent_cost_usd_month": 9.92,
+  "agent_cost_vnd_per_order": 334,
   "human_minutes_saved_pct": 75.4
  },
  "tram_50": {
@@ -255,10 +255,10 @@
    "note": "tay chân: cùng số phút ở hai bên, agent không thay"
   },
   "agents": 6,
-  "agent_cost_vnd_day": 0,
-  "agent_cost_vnd_month": 0,
-  "agent_cost_usd_month": 0.0,
-  "agent_cost_vnd_per_order": 0,
+  "agent_cost_vnd_day": 501700,
+  "agent_cost_vnd_month": 13044200,
+  "agent_cost_usd_month": 496.0,
+  "agent_cost_vnd_per_order": 334,
   "human_minutes_saved_pct": 65.9
  },
  "assumptions": [
@@ -382,7 +382,7 @@
   "phút có agent là phút người duyệt và giao nhận, đọc từ sự kiện approve và thanh toán"
  ],
  "computed_from": {
-  "events": "runs\\mock\\events.jsonl",
-  "sha256": "e9f6d679aa7800b58b9f457435e97fcfa475bbf65e98ebb67239d6a5695c18ad"
+  "events": "runs\\live_final\\events.jsonl",
+  "sha256": "2baf484164002cfcf5241a675291109aa587da7c7df87c493d3645475361a42a"
  }
 }

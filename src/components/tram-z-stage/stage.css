@@ -1197,6 +1197,16 @@
   color: var(--tzs-grey-2);
 }
 
+.tzs-table-grid .m,
+.tzs-table-grid .a {
+  white-space: nowrap;
+}
+
+/* long money values (13.044.200 đ) stay on one line */
+.tzs-table-grid .a.long {
+  font-size: 36px;
+}
+
 .tzs-table-grid .a {
   color: var(--tzs-red);
   background: #fff5f5;

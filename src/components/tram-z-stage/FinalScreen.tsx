@@ -54,7 +54,7 @@ function Table({ title, sub, block, delay }: { title: string; sub: string; block
               {r.unit && r.manual !== '—' && <span className="unit">{r.unit}</span>}
             </motion.div>
             <motion.div
-              className="a"
+              className={r.agent.length > 9 ? 'a long' : 'a'}
               initial={{ opacity: 0, x: -12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: delay + 0.75 + i * 0.55 }}
