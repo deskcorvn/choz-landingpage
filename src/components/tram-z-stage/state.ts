@@ -299,6 +299,16 @@ export function applyEvent(prev: StageState, ev: StageEvent, now: number, anchor
         const i = findListing(s.listings, ev.detail?.listing_run)
         if (i >= 0) s.listings = s.listings.map((x, k) => (k === i ? { ...x, live: true } : x))
       }
+      // A household paying at the station: count its orders and money at once (the payment line is the source;
+      // the next metric line carries the same running totals).
+      if (ev.detail?.payment) {
+        const paid = Array.isArray(ev.detail.orders) ? ev.detail.orders.length : 0
+        s.metrics = {
+          ...s.metrics,
+          orders: (s.metrics.orders ?? 0) + paid,
+          gmv_vnd: (s.metrics.gmv_vnd ?? 0) + Number(ev.detail.paid_vnd ?? 0),
+        }
+      }
       break
     }
     case 'handoff': {
