@@ -1,4 +1,4 @@
-/** Shapes of the files the stage reads. Mirrors choz-listing-agent/sim/schema.py (do not rename fields). */
+/** Shapes of the files the stage reads. Mirrors choz-listing-agent/sim/schema.py and sim/workload.py (do not rename fields). */
 
 export type EventType =
   | 'scene'
@@ -61,6 +61,16 @@ export interface StageEvent {
   scene?: string
 }
 
+/** One role in the headcount table (sim/workload.py `roles()`). */
+export interface RoleRow {
+  role: string
+  minutes_day: number
+  people: number
+  people_whole: number
+  wage_vnd_month: number
+  cost_vnd_month: number
+}
+
 export interface HeadcountBlock {
   stations: number
   orders_per_day: number
@@ -70,6 +80,14 @@ export interface HeadcountBlock {
   agent_cost_vnd_month: number
   agent_cost_vnd_per_order: number
   human_minutes_saved_pct: number
+  roles_manual?: RoleRow[]
+  roles_with_agents?: RoleRow[]
+  people_cost_vnd_month_manual?: number
+  people_cost_vnd_month_with_agents?: number
+  total_cost_vnd_month_manual?: number
+  total_cost_vnd_month_with_agents?: number
+  saving_vnd_month?: number
+  wage_source?: string
   [key: string]: unknown
 }
 

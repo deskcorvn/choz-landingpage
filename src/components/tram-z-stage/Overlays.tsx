@@ -5,7 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { IconCheck } from './icons'
 import { CARDS_X, cardAnchor } from './layout'
 import { APPROVAL_KIND } from './roster'
-import { speakerLabel, type Beam, type Bubble, type Flight, type Tick } from './state'
+import { actorName } from './roster'
+import { speakerLabel, type Beam, type Bubble, type Flight, type HandoffCard, type Tick } from './state'
 
 const MAP_MIN_X = 250
 const MAP_MAX_X = 1152 - 250
@@ -171,6 +172,33 @@ export function Ticks({ ticks, slow }: { ticks: Tick[]; slow: number }) {
               <IconCheck />
             </motion.div>
           </div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/** handoff: a card over the map that says who handed what to whom, while the beam travels between the cards. */
+export function HandoffCards({ cards, slow, place }: { cards: HandoffCard[]; slow: number; place: 'top' | 'bottom' }) {
+  return (
+    <div className="tzs-overlay">
+      <AnimatePresence>
+        {cards.map((h) => (
+          <motion.div
+            key={h.id}
+            className={`tzs-handoff-card ${place}`}
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 * slow, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="k">
+              <span className="who">{actorName(h.from)}</span>
+              <span className="arrow">bàn giao cho</span>
+              <span className="who">{actorName(h.to)}</span>
+            </div>
+            <div className="v">{h.text}</div>
+          </motion.div>
         ))}
       </AnimatePresence>
     </div>

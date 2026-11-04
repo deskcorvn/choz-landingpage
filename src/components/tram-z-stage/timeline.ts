@@ -1,19 +1,26 @@
 /**
- * Replay timing. 26 simulated hours play in 30 s, not uniformly: each scene gets its own duration and its events
- * are spread over it by simulated time, mixed half-and-half with an even spacing so bursts of events at the same
- * minute stay readable and nothing is lost.
+ * Replay timing. 26 simulated hours play scene by scene: each scene gets its own duration and its events are
+ * spread over it by simulated time, mixed half-and-half with an even spacing so bursts of events at the same
+ * minute stay readable and nothing is lost. After each scene the stage holds on a conclusion card for CARD_MS.
+ * The 30-second version (?brief=1) uses the shorter durations and no cards.
  */
 import { SCENES } from './roster'
 import type { StageEvent } from './types'
 
 export const DEFAULT_SCENE_MS = 4000
+/** How long each scene's conclusion card stays on screen. */
+export const CARD_MS = 5000
 /** Live mode: never fire two events closer than this on stage. */
 export const LIVE_GAP_MS = 180
 
 export interface SceneSlot {
   scene: string
+  /** when the scene's events start */
   start: number
+  /** ms of play (events) */
   ms: number
+  /** ms of the conclusion card after the play (0 in brief mode) */
+  hold: number
 }
 
 export interface Schedule {
@@ -21,11 +28,25 @@ export interface Schedule {
   at: number[]
   scenes: SceneSlot[]
   total: number
+  brief: boolean
 }
 
-const sceneMs = (code: string) => SCENES.find((s) => s.code === code)?.ms ?? DEFAULT_SCENE_MS
+export interface ScheduleOptions {
+  /** the 30-second version: short scenes, no conclusion cards */
+  brief?: boolean
+  /** conclusion card hold per scene (default CARD_MS) */
+  cardMs?: number
+}
 
-export function buildSchedule(events: StageEvent[]): Schedule {
+const sceneMs = (code: string, brief: boolean) => {
+  const s = SCENES.find((x) => x.code === code)
+  if (!s) return DEFAULT_SCENE_MS
+  return brief ? s.briefMs : s.ms
+}
+
+export function buildSchedule(events: StageEvent[], opts: ScheduleOptions = {}): Schedule {
+  const brief = !!opts.brief
+  const hold = brief ? 0 : (opts.cardMs ?? CARD_MS)
   const at: number[] = new Array(events.length).fill(0)
   const scenes: SceneSlot[] = []
 
@@ -40,8 +61,8 @@ export function buildSchedule(events: StageEvent[]): Schedule {
 
   let cursor = 0
   for (const g of groups) {
-    const ms = sceneMs(g.scene)
-    scenes.push({ scene: g.scene, start: cursor, ms })
+    const ms = sceneMs(g.scene, brief)
+    scenes.push({ scene: g.scene, start: cursor, ms, hold })
     const first = events[g.idx[0]]
     const rest = first.type === 'scene' ? g.idx.slice(1) : g.idx
     if (first.type === 'scene') at[g.idx[0]] = cursor
@@ -58,9 +79,18 @@ export function buildSchedule(events: StageEvent[]): Schedule {
         at[ei] = cursor + lead + span * (0.5 * prop + 0.5 * even)
       })
     }
-    cursor += ms
+    cursor += ms + hold
   }
-  return { at, scenes, total: cursor }
+  return { at, scenes, total: cursor, brief }
+}
+
+/** The scene slot whose play or hold contains the playhead, and whether the playhead is in its hold. */
+export function slotAt(scenes: SceneSlot[], playhead: number): { slot: SceneSlot; index: number; holding: boolean } | null {
+  for (let i = scenes.length - 1; i >= 0; i--) {
+    const s = scenes[i]
+    if (playhead >= s.start) return { slot: s, index: i, holding: s.hold > 0 && playhead >= s.start + s.ms }
+  }
+  return null
 }
 
 /** Simulated time shown at a playhead, interpolated between the events around it (the clock runs, it does not jump). */

@@ -2,21 +2,37 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { conclusionOf } from '../../src/components/tram-z-stage/conclusion'
+import { finalColumns } from '../../src/components/tram-z-stage/FinalScreen'
 import { clockOf } from '../../src/components/tram-z-stage/format'
-import { SCENES } from '../../src/components/tram-z-stage/roster'
+import { SCENES, TOOL_LABELS } from '../../src/components/tram-z-stage/roster'
 import { applyEvent, initialState } from '../../src/components/tram-z-stage/state'
-import { buildSchedule, parseJsonl } from '../../src/components/tram-z-stage/timeline'
+import { CARD_MS, buildSchedule, parseJsonl, slotAt } from '../../src/components/tram-z-stage/timeline'
+import type { Headcount } from '../../src/components/tram-z-stage/types'
 
 const { events } = parseJsonl(readFileSync(path.resolve(__dirname, '../../public/demo/events.jsonl'), 'utf8'))
+const headcount = JSON.parse(readFileSync(path.resolve(__dirname, '../../public/demo/headcount.json'), 'utf8')) as Headcount
 
 describe('tram-z-stage timeline', () => {
-  it('replays the sample day in 30 s with the per-scene durations', () => {
+  it('plays each scene then holds on its conclusion card', () => {
     const sch = buildSchedule(events)
-    expect(sch.total).toBe(30000)
-    expect(sch.scenes.map((s) => [s.scene, s.ms])).toEqual(SCENES.map((s) => [s.code, s.ms]))
+    const play = SCENES.reduce((n, s) => n + s.ms, 0)
+    expect(sch.total).toBe(play + SCENES.length * CARD_MS)
+    expect(sch.scenes.map((s) => [s.scene, s.ms, s.hold])).toEqual(SCENES.map((s) => [s.code, s.ms, CARD_MS]))
+    const first = sch.scenes[0]
+    expect(slotAt(sch.scenes, first.start + first.ms - 1)?.holding).toBe(false)
+    expect(slotAt(sch.scenes, first.start + first.ms + 1)?.holding).toBe(true)
+    expect(slotAt(sch.scenes, sch.scenes[1].start)?.slot.scene).toBe('dang_ban')
   })
 
-  it('keeps events in order, inside their scene, never on top of each other', () => {
+  it('brief mode is the 30-second version without cards', () => {
+    const sch = buildSchedule(events, { brief: true })
+    expect(sch.total).toBe(30000)
+    expect(sch.scenes.every((s) => s.hold === 0)).toBe(true)
+    expect(slotAt(sch.scenes, 29000)?.holding).toBe(false)
+  })
+
+  it('keeps events in order, inside their scene play, never on top of each other', () => {
     const { at, scenes } = buildSchedule(events)
     let scene = -1
     for (let i = 0; i < events.length; i++) {
@@ -43,9 +59,77 @@ describe('tram-z-stage state', () => {
     expect(final.metrics).toMatchObject(lastMetric?.metrics ?? {})
   })
 
-  it('stamps the banned listing and reads the 10% split 5/2/1/2', () => {
+  it('stamps the refused listing, keeps the OCOP badge and reads the 10% split 5/2/1/2', () => {
     expect(final.listings.some((l) => l.blocked)).toBe(true)
+    expect(final.listings.some((l) => l.ocop)).toBe(true)
     expect(final.settlement?.feePct).toBeCloseTo(10)
     expect(final.settlement?.parts.map((p) => Math.round(p.pct))).toEqual([5, 2, 1, 2])
+    expect(final.supplierSettlements.length).toBe(5)
+  })
+
+  it('builds the boards of every scene from the events', () => {
+    expect(final.baskets?.baskets).toBe(30)
+    expect(final.picklist?.orders).toBe(30)
+    expect(final.picklist?.bySupplier.length).toBeGreaterThan(0)
+    expect(final.lots.length).toBe(6)
+    expect(final.lots.some((l) => l.replaced)).toBe(true)
+    expect(final.route?.legs.some((l) => l.dropBags === 30)).toBe(true)
+    expect(final.route?.at).toBe(final.route!.legs.length - 1)
+    expect(final.payments.reduce((n, p) => n + p.orders, 0)).toBe(30)
+    expect(final.thread.map((t) => t.kind)).toEqual(['customer', 'tool', 'tool', 'request', 'approve', 'answer'])
+    expect(final.approvals.filter((a) => a.answer).length).toBe(final.approvals.length)
+  })
+
+  it('keeps a hand-over card for each handoff between two agents', () => {
+    const handoffs = events.filter((e) => e.type === 'handoff')
+    const at = events.indexOf(handoffs[0])
+    const s = events.slice(0, at + 1).reduce((acc, ev, i) => applyEvent(acc, ev, i * 100, anchor), initialState())
+    expect(s.handoffs.length).toBe(1)
+    expect(s.handoffs[0].from).toBe(handoffs[0].from)
+  })
+
+  it('has a Vietnamese label for every tool the agents used', () => {
+    const tools = new Set(events.filter((e) => e.type === 'tool').map((e) => e.tool!.name))
+    for (const t of tools) expect(TOOL_LABELS[t], t).toBeTruthy()
+  })
+})
+
+describe('tram-z-stage conclusions', () => {
+  it('writes a conclusion card for every scene, with numbers from the events', () => {
+    for (const s of SCENES) {
+      const c = conclusionOf(s.code, events)
+      expect(c, s.code).not.toBeNull()
+      expect(c!.title.length).toBeGreaterThan(10)
+      expect(c!.steps.length).toBeGreaterThan(0)
+      expect(c!.numbers.length).toBeGreaterThan(0)
+    }
+    expect(conclusionOf('dat_gio', events)!.numbers[0]).toEqual({ label: 'Giỏ đặt', value: '30' })
+    expect(conclusionOf('doi_soat', events)!.numbers[1].value).toBe('322.800 đ')
+    expect(conclusionOf('ra_tram', events)!.numbers[1].value).toBe('30')
+    expect(conclusionOf('tong_ket', events)!.numbers[0].value).toBe('30')
+    expect(conclusionOf('dang_ban', events)!.approvals.length).toBe(1)
+  })
+
+  it('uses no English jargon in what the jury reads', () => {
+    for (const s of SCENES) {
+      const c = conclusionOf(s.code, events)!
+      const text = [c.title, c.summary, ...c.steps.map((x) => x.did), ...c.numbers.map((n) => n.label)].join(' ')
+      expect(text).not.toMatch(/\b(claim|picklist|handoff|tool|mock)\b/i)
+    }
+  })
+})
+
+describe('tram-z-stage final screen', () => {
+  it('lists people by role and money on both sides, from headcount.json', () => {
+    for (const key of ['tram_1', 'tram_50'] as const) {
+      const b = headcount[key]
+      const { manual, agents, saving } = finalColumns(b)
+      expect(manual.roles.length).toBeGreaterThan(0)
+      expect(agents.roles.length).toBeGreaterThan(0)
+      expect(manual.peopleCost).toBe(b.roles_manual!.reduce((n, r) => n + r.cost_vnd_month, 0))
+      expect(agents.total).toBe(agents.peopleCost + agents.agentCost)
+      expect(saving).toBe(manual.total - agents.total)
+      expect(agents.agents).toBe(6)
+    }
   })
 })

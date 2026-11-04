@@ -1,29 +1,34 @@
 'use client'
 
 /**
- * "Một ngày của Trạm Z": a 30-second replay of one simulated day, for a 1920×1080 projector.
+ * "Một ngày của Trạm Z": one simulated day replayed scene by scene for a 1920×1080 projector. Each scene plays its
+ * events, then holds on a conclusion card; the final screen compares people-only with people + agents.
  * Sources: ?src=/demo/events.jsonl (default) replays a file, ?ws=ws://localhost:8765 adds events live.
- * headcount.json and summary.json are read from the same folder (?data= overrides). No API calls.
+ * ?brief=1 is the 30-second version without conclusion cards. headcount.json and summary.json are read from the
+ * same folder (?data= overrides). No API calls.
  */
 import './stage.css'
 
 import { AnimatePresence } from 'framer-motion'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { AgentCard } from './AgentCard'
+import { conclusionOf, type Conclusion } from './conclusion'
+import { ConclusionCard } from './ConclusionCard'
 import { FinalScreen } from './FinalScreen'
+import { FlowStrip } from './FlowStrip'
 import { clockOf, fmtInt } from './format'
 import { PLACE_LABELS, homeSpot, spriteOf } from './geometry'
 import { IconFull, IconLog, IconPause, IconPlay, IconRestart, IconTable } from './icons'
 import { CARD_H, MAIN_Y, MAP_X, MAP_Y, STAGE_H, STAGE_W, cardAnchor, cardTop } from './layout'
 import { LogPanel } from './LogPanel'
-import { Beams, Bubbles, Flights, Ticks } from './Overlays'
-import { ListingPanel, SettlementPanel } from './Panels'
+import { Beams, Bubbles, Flights, HandoffCards, Ticks } from './Overlays'
+import { BasketPanel, ListingPanel, LotPanel, PickupPanel, RoutePanel, SettlementPanel } from './Panels'
 import type { TramMap } from './pixiMap'
 import { RollingNumber } from './RollingNumber'
 import { AGENTS, AGENT_CODES, SCENES, SERVICE_LABELS, sceneIndex } from './roster'
 import { applyEvent, initialState, prune, type Anchor, type StageState } from './state'
-import { LIVE_GAP_MS, buildSchedule, parseJsonl, simTimeAt, type SceneSlot } from './timeline'
+import { LIVE_GAP_MS, buildSchedule, parseJsonl, simTimeAt, slotAt, type SceneSlot } from './timeline'
 import type { Headcount, StageEvent, Summary } from './types'
 
 export interface TramZStageProps {
@@ -33,6 +38,11 @@ export interface TramZStageProps {
 }
 
 type Source = { kind: 'file'; src: string; base: string } | { kind: 'ws'; url: string; base: string }
+
+/** Scenes whose panel sits in the lower half of the map (the hand-over card then goes to the top). */
+const PANEL_BOTTOM = new Set(['dang_ban', 'gom_kho', 'doi_soat'])
+/** How long the day's conclusion card (tong_ket) stays before the final screen, in live mode. */
+const LIVE_DAY_CARD_MS = 6000
 
 const dirOf = (url: string) => {
   const i = url.lastIndexOf('/')
@@ -103,8 +113,8 @@ function ModeBadge({ mode, ws, wsState }: { mode: string | null; ws: boolean; ws
   if (mode === 'mock')
     return (
       <div className="tzs-mode mock">
-        <div className="tzs-mode-main">DỮ LIỆU MOCK</div>
-        <div className="tzs-mode-sub">dữ liệu mẫu, chưa gọi model thật</div>
+        <div className="tzs-mode-main">DỮ LIỆU MẪU</div>
+        <div className="tzs-mode-sub">chưa gọi model thật</div>
       </div>
     )
   return <div className="tzs-mode" />
@@ -118,14 +128,17 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   const [started, setStarted] = useState(false)
   const [paused, setPaused] = useState(false)
   const [slow, setSlow] = useState(false)
+  const [brief, setBrief] = useState(false)
   const [progress, setProgress] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
   const [final, setFinal] = useState<null | { manual: boolean }>(null)
+  const [card, setCard] = useState<Conclusion | null>(null)
   const [headcount, setHeadcount] = useState<Headcount | null>(null)
   const [summary, setSummary] = useState<Summary | null>(null)
   const [source, setSource] = useState<Source | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [total, setTotal] = useState(0)
   const [wsState, setWsState] = useState<'idle' | 'connecting' | 'open' | 'closed'>('idle')
   const [eventCount, setEventCount] = useState(0)
 
@@ -140,9 +153,11 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   const pausedRef = useRef(false)
   const speedRef = useRef(1)
   const liveRef = useRef(false)
+  const briefRef = useRef(false)
   const autoplayRef = useRef(false)
   const finalShownRef = useRef(false)
   const tongKetAtRef = useRef<number | null>(null)
+  const cardSceneRef = useRef<string | null>(null)
   const clockTextRef = useRef('')
   const baseRef = useRef('')
   const mapRef = useRef<TramMap | null>(null)
@@ -151,14 +166,24 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
 
   /* ------------------------------------------------------------ playback controls */
 
+  const setSchedule = useCallback((events: StageEvent[]) => {
+    const sch = buildSchedule(events, { brief: briefRef.current })
+    atRef.current = sch.at
+    totalRef.current = sch.total
+    scenesRef.current = sch.scenes
+    setTotal(sch.total)
+  }, [])
+
   const resetPlayback = useCallback(() => {
     cursorRef.current = 0
     playheadRef.current = 0
     finalShownRef.current = false
     tongKetAtRef.current = null
+    cardSceneRef.current = null
     clockTextRef.current = ''
     setSt(initialState())
     setFinal(null)
+    setCard(null)
     setProgress(0)
     setClock(null)
     mapRef.current?.reset()
@@ -183,16 +208,11 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   }, [])
 
   const restart = useCallback(() => {
-    if (liveRef.current) {
-      // after (or during) a live run, restart replays what arrived with the scene timing
-      const sch = buildSchedule(eventsRef.current)
-      atRef.current = sch.at
-      totalRef.current = sch.total
-      scenesRef.current = sch.scenes
-    }
+    // after (or during) a live run, restart replays what arrived with the scene timing
+    if (liveRef.current) setSchedule(eventsRef.current)
     resetPlayback()
     begin()
-  }, [begin, resetPlayback])
+  }, [begin, resetPlayback, setSchedule])
 
   /** Jump to a playhead (keys 1–7 = scene starts, ?at=ms): replays everything before it instantly. */
   const seek = useCallback(
@@ -223,8 +243,29 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     fetchJson<Headcount>(`${baseRef.current}headcount.json`).then((h) => {
       if (h) setHeadcount(h)
     })
+    setCard(null)
     setFinal({ manual })
   }, [])
+
+  /** Enter / →: the next scene (from a conclusion card too); after the last one, the final screen. */
+  const nextScene = useCallback(() => {
+    const slots = scenesRef.current
+    const here = slotAt(slots, playheadRef.current)
+    const i = here ? here.index + 1 : 0
+    if (i < slots.length) seek(slots[i].start)
+    else if (!finalShownRef.current) {
+      finalShownRef.current = true
+      showFinal(false)
+    }
+  }, [seek, showFinal])
+
+  const prevScene = useCallback(() => {
+    const slots = scenesRef.current
+    const here = slotAt(slots, playheadRef.current)
+    if (!here) return
+    const back = playheadRef.current - here.slot.start > 800 ? here.index : Math.max(0, here.index - 1)
+    seek(slots[back].start)
+  }, [seek])
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen()
@@ -250,6 +291,8 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     const ws = q.get('ws')
     const auto = q.get('autoplay')
     const id = requestAnimationFrame(() => {
+      briefRef.current = q.get('brief') === '1'
+      setBrief(briefRef.current)
       if (ws) {
         liveRef.current = true
         autoplayRef.current = auto !== '0'
@@ -285,10 +328,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
           const { events } = parseJsonl(text)
           if (!events.length) throw new Error('tệp không có sự kiện nào')
           eventsRef.current = events
-          const sch = buildSchedule(events)
-          atRef.current = sch.at
-          totalRef.current = sch.total
-          scenesRef.current = sch.scenes
+          setSchedule(events)
           setEventCount(events.length)
           resetPlayback()
           setLoaded(true)
@@ -353,7 +393,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
       window.clearTimeout(retry)
       sock?.close()
     }
-  }, [source, begin, resetPlayback, seek])
+  }, [source, begin, resetPlayback, seek, setSchedule])
 
   /* ------------------------------------------------------------ the pixel map (pixi, client only) */
 
@@ -413,7 +453,8 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
       }
       map?.update(adv)
 
-      const t = simTimeAt(evs, at, cursorRef.current, ph)
+      const holdNow = !liveRef.current && slotAt(scenesRef.current, ph)?.holding
+      const t = holdNow && cursorRef.current > 0 ? evs[cursorRef.current - 1].t : simTimeAt(evs, at, cursorRef.current, ph)
       if (t != null) {
         map?.setTime(t)
         const text = clockOf(t)
@@ -433,6 +474,19 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
         } else if (tagEl.style.display !== 'none') tagEl.style.display = 'none'
       }
 
+      // the conclusion card of the scene whose hold the playhead is in (live: the day's card after tong_ket)
+      let cardScene: string | null = null
+      if (!liveRef.current) {
+        const here = slotAt(scenesRef.current, ph)
+        if (here?.holding) cardScene = here.slot.scene
+      } else if (tongKetAtRef.current != null && cursorRef.current >= evs.length && ph >= tongKetAtRef.current + 1500) {
+        cardScene = 'tong_ket'
+      }
+      if (cardScene !== cardSceneRef.current) {
+        cardSceneRef.current = cardScene
+        setCard(cardScene ? conclusionOf(cardScene, evs) : null)
+      }
+
       if (fired.length || ts - lastUi > 100) {
         lastUi = ts
         setNow(ph)
@@ -442,7 +496,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
 
       if (!finalShownRef.current && evs.length && cursorRef.current >= evs.length) {
         const done = liveRef.current
-          ? tongKetAtRef.current != null && ph >= tongKetAtRef.current + 2000
+          ? tongKetAtRef.current != null && ph >= tongKetAtRef.current + 1500 + (briefRef.current ? 500 : LIVE_DAY_CARD_MS)
           : ph >= totalRef.current
         if (done) {
           finalShownRef.current = true
@@ -454,7 +508,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     return () => cancelAnimationFrame(raf)
   }, [showFinal])
 
-  /* ------------------------------------------------------------ keys: Space pause, F fullscreen */
+  /* ------------------------------------------------------------ keys: Space pause, F fullscreen, Enter/→ next scene */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -467,14 +521,20 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
         e.preventDefault()
         toggleFullscreen()
       } else if (e.key === 'Escape') setLogOpen(false)
-      else if (/^[1-7]$/.test(e.key) && !liveRef.current) {
+      else if ((e.key === 'Enter' || e.key === 'ArrowRight') && !liveRef.current) {
+        e.preventDefault()
+        nextScene()
+      } else if (e.key === 'ArrowLeft' && !liveRef.current) {
+        e.preventDefault()
+        prevScene()
+      } else if (/^[1-7]$/.test(e.key) && !liveRef.current) {
         const slot = scenesRef.current[Number(e.key) - 1]
         if (slot) seek(slot.start)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePause, toggleFullscreen, seek])
+  }, [togglePause, toggleFullscreen, seek, nextScene, prevScene])
 
   /* ------------------------------------------------------------ render */
 
@@ -488,6 +548,9 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     .filter(([k, v]) => typeof v === 'number' && SERVICE_LABELS[k])
     .map(([k, v]) => SERVICE_LABELS[k](v as number))
   const playing = started && !paused
+  const activeAgents = useMemo(() => new Set(AGENT_CODES.filter((c) => st.agents[c].activeUntil > now)), [st.agents, now])
+  const approvalText = (kind: string) => st.approvals.filter((a) => a.kind === kind && a.answer).map((a) => a.answer!).pop() ?? null
+  const lengthText = brief ? '30 giây' : `${Math.round((total || 80000) / 1000)} giây`
 
   return (
     <div className="tzs-viewport">
@@ -496,6 +559,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
         style={{ transform: `scale(${scale || 1})`, visibility: scale ? 'visible' : 'hidden' }}
         data-scene={st.scene ?? ''}
         data-events={`${st.seen}/${eventCount}`}
+        data-card={card?.scene ?? ''}
       >
         <header className="tzs-header">
           <div className="tzs-brand">
@@ -516,7 +580,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
                   <span className="tzs-scene-title">{scene.title}</span>
                 </>
               ) : (
-                <span className="tzs-scene-title">{loaded ? '26 giờ trong 30 giây' : 'Đang tải dữ liệu…'}</span>
+                <span className="tzs-scene-title">{loaded ? `26 giờ trong ${lengthText}` : 'Đang tải dữ liệu…'}</span>
               )}
             </div>
             <div className="tzs-steps">
@@ -539,7 +603,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
               <IconLog />
               Xem log
             </Btn>
-            <Btn on={!!final} onClick={() => (final ? setFinal(null) : showFinal(true))} title="Bảng 1 trạm và 50 trạm">
+            <Btn on={!!final} onClick={() => (final ? setFinal(null) : showFinal(true))} title="Bảng người và chi phí: 1 trạm, 50 trạm">
               <IconTable />
             </Btn>
             <Btn onClick={toggleFullscreen} title="Toàn màn hình (F)">
@@ -557,17 +621,30 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
         <div className="tzs-map">
           <div className="tzs-map-host" ref={mapHostRef} />
           {PLACE_LABELS.map((p) => (
-            <div key={p.text} className={`tzs-place ${p.tone}`} style={{ left: p.x, top: p.y }}>
+            <div key={p.text} className={`tzs-place ${p.tone}`} style={{ left: p.x, top: p.y < 60 ? p.y + 48 : p.y }}>
               {p.text}
             </div>
           ))}
           <div className="tzs-van-tag" ref={vanTagRef} />
+          {scene && !card && <FlowStrip scene={scene} lastActor={st.lastActor} activeAgents={activeAgents} />}
           <AnimatePresence>
-            {st.scene === 'dang_ban' && st.listings.length > 0 && (
-              <ListingPanel key="listings" listings={st.listings} slow={slowK} />
+            {!card && st.scene === 'dat_gio' && (st.baskets || st.picklist) && (
+              <BasketPanel
+                key="baskets"
+                baskets={st.baskets}
+                picklist={st.picklist}
+                substitution={st.substitution}
+                notes={st.householdNotes}
+                approved={approvalText('thay_hang')}
+                slow={slowK}
+              />
             )}
-            {(st.scene === 'doi_soat' || st.scene === 'tong_ket') && st.settlement && (
-              <SettlementPanel key="split" s={st.settlement} slow={slowK} />
+            {!card && st.scene === 'dang_ban' && st.listings.length > 0 && <ListingPanel key="listings" listings={st.listings} slow={slowK} />}
+            {!card && st.scene === 'gom_kho' && <LotPanel key="lots" lots={st.lots} approved={approvalText('nhan_hang_kho')} slow={slowK} />}
+            {!card && st.scene === 'ra_tram' && <RoutePanel key="route" route={st.route} bagsApproved={approvalText('nhan_hang_tram')} slow={slowK} />}
+            {!card && st.scene === 'nhan_hang' && <PickupPanel key="pickup" payments={st.payments} thread={st.thread} slow={slowK} />}
+            {!card && (st.scene === 'doi_soat' || st.scene === 'tong_ket') && st.settlement && (
+              <SettlementPanel key="split" s={st.settlement} suppliers={st.supplierSettlements} approved={approvalText('doi_soat')} slow={slowK} />
             )}
           </AnimatePresence>
         </div>
@@ -579,10 +656,17 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
           })}
         </div>
 
-        <Beams beams={st.beams} slow={slowK} />
-        <Bubbles bubbles={st.bubbles} slow={slowK} />
-        <Flights flights={st.flights} slow={slowK} />
-        <Ticks ticks={st.ticks} slow={slowK} />
+        {!card && (
+          <>
+            <Beams beams={st.beams} slow={slowK} />
+            <HandoffCards cards={st.handoffs} slow={slowK} place={st.scene && PANEL_BOTTOM.has(st.scene) ? 'top' : 'bottom'} />
+            <Bubbles bubbles={st.bubbles} slow={slowK} />
+            <Flights flights={st.flights} slow={slowK} />
+            <Ticks ticks={st.ticks} slow={slowK} />
+          </>
+        )}
+
+        <AnimatePresence>{card && !final && <ConclusionCard key={card.scene} c={card} slow={slowK} brief={brief} />}</AnimatePresence>
 
         <footer className="tzs-bottom">
           <div className="tzs-bottom-row">
@@ -590,15 +674,15 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
               <div className="time">{clock?.text ?? '--:--'}</div>
               <div className="day">{clock ? (clock.t < 0 ? 'Tối hôm trước' : 'Ngày nhận Giỏ') : 'Giờ mô phỏng'}</div>
             </div>
-            <Counter label="Đơn" value={m.orders} />
+            <Counter label="Đơn đã giao" value={m.orders} />
             <Counter label="Tiền hàng (đ)" value={m.gmv_vnd} flex={1.35} />
-            <Counter label="Chi phí agent (đồng)" value={m.agent_cost_vnd} />
+            <Counter label="Chi phí agent (đ)" value={m.agent_cost_vnd} />
             <div className="tzs-pair">
               <Counter className="agent" label="Việc agent đã làm" value={m.agent_actions} />
               <Counter label="Lần người duyệt" value={m.human_approvals} />
             </div>
           </div>
-          <div className="tzs-services">{services.length ? `Dịch vụ khác: ${services.join(' · ')}` : ' '}</div>
+          <div className="tzs-services">{services.length ? `Dịch vụ khác cùng trạm: ${services.join(' · ')}` : ' '}</div>
         </footer>
 
         {logOpen && <LogPanel lines={st.log} total={eventCount} onClose={() => setLogOpen(false)} />}
@@ -607,7 +691,9 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
           <div className="tzs-start">
             <div className="tzs-start-card">
               <h1>Một ngày của Trạm Z</h1>
-              <p>26 giờ của một trạm Giỏ, phát lại trong 30 giây · 6 agent, 2 người duyệt</p>
+              <p>
+                26 giờ của một trạm Giỏ đi chợ, phát lại trong {lengthText} · 6 agent làm, 2 người duyệt
+              </p>
               <Btn on onClick={begin} title="Bắt đầu (Space)">
                 <IconPlay />
                 Bắt đầu · Space
