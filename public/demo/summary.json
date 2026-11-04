@@ -1,29 +1,95 @@
 {
- "mode": "mock",
+ "mode": "live",
  "seed": 7,
- "started": "2026-11-04T07:44:30+07:00",
- "finished": "2026-11-04T07:44:30+07:00",
- "seconds": 0.01,
- "events": 134,
+ "started": "2026-11-04T07:44:49+07:00",
+ "finished": "2026-11-04T07:47:18+07:00",
+ "seconds": 149.16,
+ "events": 141,
  "orders": 30.0,
  "gmv_vnd": 3228000.0,
- "agent_actions": 52.0,
+ "agent_actions": 59.0,
  "human_approvals": 6.0,
  "human_minutes": 57.5,
  "blocked": 1.0,
- "cost": {},
- "cost_total_usd": 0,
- "cost_total_vnd": 0,
- "cost_calls_usd": 0,
+ "cost": {
+  "claude": {
+   "claude-sonnet-5-5": {
+    "calls": 36,
+    "events": 17,
+    "input_tokens": 164769,
+    "output_tokens": 6141,
+    "cached_tokens": 0,
+    "images": 0,
+    "audio_seconds": 0.0,
+    "cost_usd": 0.390948
+   }
+  },
+  "meta": {
+   "muse-voice-transcribe-1.0": {
+    "calls": 1,
+    "events": 1,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cached_tokens": 0,
+    "images": 0,
+    "audio_seconds": 5.92,
+    "cost_usd": 0.000296
+   },
+   "muse-spark-1.3": {
+    "calls": 8,
+    "events": 8,
+    "input_tokens": 28546,
+    "output_tokens": 5452,
+    "cached_tokens": 2673,
+    "images": 8,
+    "audio_seconds": 0.0,
+    "cost_usd": 0.055914
+   },
+   "sam-3.1": {
+    "calls": 4,
+    "events": 4,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cached_tokens": 0,
+    "images": 4,
+    "audio_seconds": 0.0,
+    "cost_usd": 0.01
+   }
+  }
+ },
+ "cost_total_usd": 0.457158,
+ "cost_total_vnd": 12023,
+ "cost_calls_usd": 0.457158,
  "cost_matches_calls": true,
- "metric_cost_usd": 0.0,
+ "metric_cost_usd": 0.457158,
  "usd_vnd": 26300,
  "usd_vnd_source": "giá trị trong yêu cầu demo (03/11/2026); đổi bằng biến USD_VND",
  "price_source": {
   "claude": "https://platform.claude.com/docs/en/about-claude/pricing (xem 03/11/2026)",
   "meta": "https://dev.meta.ai/docs/pricing-rate-limits (xem 31/10/2026, app/prices.py)"
  },
- "latency_ms": {},
+ "latency_ms": {
+  "claude-sonnet-5-5": {
+   "p50": 1636,
+   "p95": 3583,
+   "calls": 36
+  },
+  "muse-voice-transcribe-1.0": {
+   "p50": 2784,
+   "p95": 2784,
+   "calls": 1
+  },
+  "muse-spark-1.3": {
+   "p50": 8528,
+   "p95": 11199,
+   "calls": 8
+  },
+  "sam-3.1": {
+   "p50": 4994,
+   "p95": 9944,
+   "calls": 4
+  }
+ },
  "errors": 0,
  "stopped": null,
  "services": {
