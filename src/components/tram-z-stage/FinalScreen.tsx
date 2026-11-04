@@ -96,8 +96,63 @@ function Column({ c, side, delay }: { c: FinalColumn; side: 'manual' | 'agents';
   )
 }
 
+/**
+ * The two kinds of work, side by side: paperwork (what agents take over) and physical work (the same minutes on
+ * both sides). One station is shown in minutes per day, because "1 person vs 1 person" says nothing.
+ */
+export function BlockStrip({ b }: { b: HeadcountBlock }) {
+  const o = b.office
+  const p = b.physical
+  if (!o || !p) return null
+  const one = b.stations === 1
+  const f = one ? (n: number) => `${fmtDec(n)} phút/ngày` : (n: number) => `${fmtDec(n)} người`
+  const rows = [
+    {
+      key: 'office',
+      k: 'Việc giấy tờ, tính toán',
+      m: f(one ? o.manual_minutes : o.manual_people),
+      arrow: '→',
+      a: `${f(one ? o.with_agents_minutes : o.with_agents_people)} + ${fmtInt(b.agents)} agent`,
+      s: 'nhận đặt Giỏ, gom nhu cầu, đăng bán, kiểm tin, lịch xe, trả lời khách, đối soát, báo cáo',
+    },
+    {
+      key: 'physical',
+      k: 'Việc tay chân',
+      m: f(one ? p.minutes : p.people),
+      arrow: '=',
+      a: f(one ? p.minutes : p.people),
+      s: 'chia hàng ở kho, nhận hàng, giao túi cho khách · agent không thay',
+    },
+    {
+      key: 'total',
+      k: 'Cả ngày',
+      m: f(one ? (b.manual_minutes ?? o.manual_minutes + p.minutes) : b.manual_people),
+      arrow: '→',
+      a: f(one ? (b.with_agents_minutes ?? o.with_agents_minutes + p.minutes) : b.with_agents_people),
+      s: one ? 'tính bằng phút mỗi ngày: một trạm chưa tới một người' : 'quy ra người theo giờ công: 480 phút một ngày, hệ số dự phòng 1,2',
+    },
+  ]
+  return (
+    <motion.div className="tzs-final-blocks" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.45 }} data-blocks={one ? 'minutes' : 'people'}>
+      {rows.map((r) => (
+        <div key={r.key} className={`tzs-block ${r.key}`}>
+          <div className="k">{r.k}</div>
+          <div className="v">
+            <span className="m">{r.m}</span>
+            <span className="arr">{r.arrow}</span>
+            <span className="a">{r.a}</span>
+          </div>
+          <div className="s">{r.s}</div>
+        </div>
+      ))}
+    </motion.div>
+  )
+}
+
 function Page({ block, label }: { block: HeadcountBlock; label: string }) {
   const { manual, agents, saving } = finalColumns(block)
+  const o = block.office
+  const one = block.stations === 1
   return (
     <motion.div
       className="tzs-final-page"
@@ -109,6 +164,7 @@ function Page({ block, label }: { block: HeadcountBlock; label: string }) {
       <div className="tzs-final-sub">
         <b>{label}</b> · {fmtInt(block.orders_per_day)} đơn mỗi ngày · cùng một khối việc, hai cách vận hành
       </div>
+      <BlockStrip b={block} />
       <div className="tzs-final-cols">
         <Column c={manual} side="manual" delay={0.2} />
         <div className="tzs-final-vs">so với</div>
@@ -129,9 +185,9 @@ function Page({ block, label }: { block: HeadcountBlock; label: string }) {
         </div>
         <div className="tzs-diff-item">
           <div className="val">
-            {fmtDec(manual.people)} → {fmtDec(agents.people)}
+            {o ? (one ? `${fmtDec(o.manual_minutes)} → ${fmtDec(o.with_agents_minutes)}` : `${fmtDec(o.manual_people)} → ${fmtDec(o.with_agents_people)}`) : `${fmtDec(manual.people)} → ${fmtDec(agents.people)}`}
           </div>
-          <div className="lbl">người cần có (quy ra giờ công)</div>
+          <div className="lbl">{o ? (one ? 'phút giấy tờ mỗi ngày, làm tay → với agent' : 'người cho việc giấy tờ, làm tay → với agent') : 'người cần có (quy ra giờ công)'}</div>
         </div>
       </motion.div>
     </motion.div>

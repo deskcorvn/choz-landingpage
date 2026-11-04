@@ -43,6 +43,8 @@ export interface Bubble {
   y: number
   side: 'card' | 'map'
   until: number
+  /** honesty label under the text ("giọng đọc tổng hợp", "ảnh minh họa") */
+  label?: string
 }
 
 export interface Beam {
@@ -81,6 +83,8 @@ export interface Listing {
   key: string
   title: string
   ocop: string | null
+  /** honesty label from the supplier's say (synthetic voice, drawn photo) */
+  label: string | null
   verdict: 'pass' | 'warn' | 'block' | null
   verdictText: string | null
   note: string | null
@@ -173,7 +177,9 @@ export interface RouteLeg {
   dropBags?: number
   station?: string
   pickLaundry?: number
+  pickParcels?: number
   bringBack?: number
+  bringBackParcels?: number
 }
 
 export interface Route {
@@ -181,9 +187,20 @@ export interface Route {
   bags: number
   stations: number
   laundry: string[]
+  parcels: string[]
+  /** the return trip in words, from plan_route */
+  returnTrip: string
   legs: RouteLeg[]
   /** index of the leg the van is on (from xe1 move events) */
   at: number
+}
+
+/** dat_gio: one house's baskets, from the household bubbles before the picklist exists. */
+export interface HouseBasket {
+  id: string
+  house: number
+  households: number
+  text: string
 }
 
 /** nhan_hang: one house's visit to the station. */
@@ -227,9 +244,12 @@ export interface StageState {
   settlement: Settlement | null
   supplierSettlements: SupplierSettlement[]
   baskets: BasketBoard | null
+  houseBaskets: HouseBasket[]
   picklist: Picklist | null
   substitution: Substitution | null
   householdNotes: { id: string; to: string; text: string }[]
+  /** honesty labels announced with a listing key, before the listing tool creates the card */
+  labels: Record<string, string>
   lots: Lot[]
   route: Route | null
   payments: Payment[]
@@ -284,9 +304,11 @@ export function initialState(): StageState {
     settlement: null,
     supplierSettlements: [],
     baskets: null,
+    houseBaskets: [],
     picklist: null,
     substitution: null,
     householdNotes: [],
+    labels: {},
     lots: [],
     route: null,
     payments: [],
@@ -353,6 +375,8 @@ function routeFrom(o: any): Route | null {
     bags: Number(o.bags ?? 0),
     stations: Number(o.stations ?? 1),
     laundry: Array.isArray(o.laundry_households) ? o.laundry_households.map(String) : [],
+    parcels: Array.isArray(o.parcel_households) ? o.parcel_households.map(String) : [],
+    returnTrip: String(o.return_trip ?? ''),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     legs: o.legs.map((l: any) => ({
       from: String(l.from),
@@ -361,7 +385,9 @@ function routeFrom(o: any): Route | null {
       dropBags: typeof l.drop_bags === 'number' ? l.drop_bags : undefined,
       station: l.station ? String(l.station) : undefined,
       pickLaundry: typeof l.pick_laundry === 'number' ? l.pick_laundry : undefined,
+      pickParcels: typeof l.pick_parcels === 'number' ? l.pick_parcels : undefined,
       bringBack: typeof l.bring_back_laundry === 'number' ? l.bring_back_laundry : undefined,
+      bringBackParcels: typeof l.bring_back_parcels === 'number' ? l.bring_back_parcels : undefined,
     })),
     at: -1,
   }
@@ -437,7 +463,8 @@ export function applyEvent(prev: StageState, ev: StageEvent, now: number, anchor
         a.summary = ev.tool.output_summary
         a.ok = ev.tool.ok
       }
-      if (ev.type === 'tool' || ev.type === 'say') a.actions += 1
+      // a read-out of the metrics (detail.auto, the closing line) is not agent work
+      if (ev.type === 'tool' || (ev.type === 'say' && !ev.detail?.auto)) a.actions += 1
     })
   }
   if (isAgent(ev.to) && ev.type !== 'approve') touch(ev.to)
@@ -457,6 +484,7 @@ export function applyEvent(prev: StageState, ev: StageEvent, now: number, anchor
       y: at.y,
       side: at.side,
       until: now + BUBBLE_MS,
+      label: ev.detail?.label && (ev.detail.synthetic_voice || ev.detail.illustration) ? String(ev.detail.label) : undefined,
     }
     s.bubbles = [...s.bubbles.filter((x) => x.key !== at.key), b]
   }
@@ -503,6 +531,14 @@ export function applyEvent(prev: StageState, ev: StageEvent, now: number, anchor
       }
       if (ev.to === 'ag_dang_ban' && ev.detail?.ocop && ev.detail?.listing)
         s.ocop = { ...s.ocop, [String(ev.detail.listing)]: String(ev.detail.ocop) }
+      if (ev.to === 'ag_dang_ban' && ev.detail?.label && ev.detail?.listing)
+        s.labels = { ...s.labels, [String(ev.detail.listing)]: String(ev.detail.label) }
+      // a house booking its baskets (dat_gio): one row per house on the "Gom đơn" board
+      if (ev.to === 'ag_chia_don' && ev.detail?.house)
+        s.houseBaskets = [
+          ...s.houseBaskets,
+          { id: ev.id, house: Number(ev.detail.house), households: Array.isArray(ev.detail.households) ? ev.detail.households.length : 0, text: ev.text ?? '' },
+        ]
       // customer-care thread (nhan_hang)
       if (ev.to === 'ag_cham_khach' && ev.from && !isAgent(ev.from)) pushThread('customer', ev.from, ev.text ?? '')
       if (ev.from === 'ag_cham_khach' && ev.to && !isAgent(ev.to) && !ev.to.startsWith('hu_')) pushThread('answer', ev.from, ev.text ?? '')
@@ -591,6 +627,7 @@ export function applyEvent(prev: StageState, ev: StageEvent, now: number, anchor
           key: key || ev.id,
           title: ev.tool.output_summary,
           ocop: ev.detail?.ocop ? String(ev.detail.ocop) : (s.ocop[key] ?? null),
+          label: s.labels[key] ?? null,
           verdict: null,
           verdictText: null,
           note: null,

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 import { fmtInt, fmtPct, fmtVnd } from './format'
 import { LOT_NAMES, actorName } from './roster'
-import type { BasketBoard, Listing, Lot, Payment, Picklist, Route, Settlement, Substitution, SupplierSettlement, ThreadLine } from './state'
+import type { BasketBoard, HouseBasket, Listing, Lot, Payment, Picklist, Route, Settlement, Substitution, SupplierSettlement, ThreadLine } from './state'
 
 const PLACE: Record<string, string> = {
   loc_kho: 'Kho khu vực',
@@ -50,6 +50,7 @@ function Panel({
 
 export function BasketPanel({
   baskets,
+  houses,
   picklist,
   substitution,
   notes,
@@ -57,6 +58,7 @@ export function BasketPanel({
   slow,
 }: {
   baskets: BasketBoard | null
+  houses: HouseBasket[]
   picklist: Picklist | null
   substitution: Substitution | null
   notes: { id: string; to: string; text: string }[]
@@ -69,6 +71,16 @@ export function BasketPanel({
       <div className="tzs-board-cols">
         <div className="tzs-board-col">
           <div className="tzs-board-h">Khách đã đặt</div>
+          {houses.length > 0 && (
+            <div className="tzs-houses">
+              {houses.map((h) => (
+                <motion.div key={h.id} className="tzs-house-row" initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.25 * slow }}>
+                  <span>Nhà {h.house}</span>
+                  <b>{fmtInt(h.households)} Giỏ</b>
+                </motion.div>
+              ))}
+            </div>
+          )}
           {baskets ? (
             <>
               <div className="tzs-big">
@@ -89,7 +101,7 @@ export function BasketPanel({
               <div className="tzs-board-line">Tiền hàng đặt: <b>{fmtVnd(baskets.total)}</b></div>
             </>
           ) : (
-            <div className="tzs-board-wait">Đang đọc Giỏ…</div>
+            <div className="tzs-board-wait">{houses.length ? 'Agent đang đọc Giỏ…' : 'Đang chờ khách đặt…'}</div>
           )}
         </div>
         <div className="tzs-board-arrow">→</div>
@@ -183,6 +195,7 @@ export function ListingPanel({ listings, slow }: { listings: Listing[]; slow: nu
                 <div className="tzs-listing-title">{l.title}</div>
                 <div className="tzs-chips">
                   {l.ocop && <span className="tzs-chip ocop">OCOP {l.ocop}</span>}
+                  {l.label && <span className="tzs-chip label">{l.label}</span>}
                   <span className={`tzs-chip ${v.cls}`}>{v.text}</span>
                   {l.waiting && <span className="tzs-chip wait">Chờ người duyệt</span>}
                   {l.live && <span className="tzs-chip ok">Đã lên tin{l.seconds ? ` · ${l.seconds}` : ''}</span>}
@@ -250,12 +263,12 @@ export function LotPanel({ lots, approved, slow }: { lots: Lot[]; approved: stri
 
 export function RoutePanel({ route, bagsApproved, slow }: { route: Route | null; bagsApproved: string | null; slow: number }) {
   return (
-    <Panel title="Lộ trình xe hôm nay" sub="agent Giao nhận lên từ phiếu gom: mỗi trạm một dòng" pos={{ left: 24, top: 66, width: 760 }} slow={slow}>
+    <Panel title="Lộ trình xe hôm nay: đi đầy, về không rỗng" sub="agent Giao nhận lên từ phiếu gom: mỗi trạm một dòng, chiều về gom đồ giặt và bưu phẩm" pos={{ left: 24, top: 66, width: 760 }} slow={slow}>
       {route ? (
         <>
           <div className="tzs-route-head">
             <span>
-              Xe 1 · rời kho <b>{route.depart}</b>
+              Xe · rời kho <b>{route.depart}</b>
             </span>
             <span>
               <b>{fmtInt(route.bags)}</b> túi cho <b>{fmtInt(route.bags)}</b> đơn · <b>{fmtInt(route.stations)}</b> trạm
@@ -264,12 +277,16 @@ export function RoutePanel({ route, bagsApproved, slow }: { route: Route | null;
           <ol className="tzs-route">
             {route.legs.map((leg, i) => {
               const state = i < route.at ? 'done' : i === route.at ? 'now' : ''
+              const tramAt = route.legs.findIndex((l) => l.to === 'loc_tram')
+              const pick = [leg.pickLaundry ? `${fmtInt(leg.pickLaundry)} túi giặt` : '', leg.pickParcels ? `${fmtInt(leg.pickParcels)} bưu phẩm` : ''].filter(Boolean).join(' + ')
               const what = leg.dropBags
-                ? `giao ${fmtInt(leg.dropBags)} túi${leg.station ? ` · ${leg.station}` : ''}`
-                : leg.bringBack
-                  ? `về kho, mang theo đồ giặt ${fmtInt(leg.bringBack)} hộ`
-                  : leg.pickLaundry
-                    ? `gom đồ giặt ${fmtInt(leg.pickLaundry)} hộ`
+                ? `giao ${fmtInt(leg.dropBags)} túi${leg.station ? ` · ${leg.station}` : ''}${pick ? ` · nhận ${pick}` : ''}`
+                : leg.bringBack || leg.bringBackParcels
+                  ? `về kho, mang theo ${[leg.bringBack ? `${fmtInt(leg.bringBack)} túi giặt` : '', leg.bringBackParcels ? `${fmtInt(leg.bringBackParcels)} bưu phẩm` : ''].filter(Boolean).join(' + ')}`
+                  : leg.to === 'loc_duong'
+                    ? tramAt >= 0 && i > tramAt
+                      ? 'đường về, chở đồ giặt và bưu phẩm'
+                      : `đường ra trạm, chở ${fmtInt(route.bags)} túi`
                     : leg.to === 'loc_tram'
                       ? 'ghé trạm'
                       : ''
@@ -283,11 +300,20 @@ export function RoutePanel({ route, bagsApproved, slow }: { route: Route | null;
               )
             })}
           </ol>
-          {route.laundry.length > 0 && (
-            <div className="tzs-board-line">
-              Chuyến về không chạy rỗng: gom đồ giặt của {route.laundry.map((h) => `hộ ${h.slice(2)}`).join(', ')}
+          <div className="tzs-route-two">
+            <div className="tzs-route-dir out">
+              <div className="k">Chiều đi</div>
+              <b>{fmtInt(route.bags)} túi</b> cho {fmtInt(route.bags)} đơn → Trạm Z, góc trong tiệm tạp hóa
             </div>
-          )}
+            <div className="tzs-route-dir back">
+              <div className="k">Chiều về</div>
+              <b>{fmtInt(route.laundry.length)} túi giặt</b>
+              {route.laundry.length > 0 && ` (hộ ${route.laundry.map((h) => String(parseInt(h.slice(2), 10))).join(', ')})`}
+              {' + '}
+              <b>{fmtInt(route.parcels.length)} bưu phẩm</b>
+              {route.parcels.length > 0 && ` (hộ ${route.parcels.map((h) => String(parseInt(h.slice(2), 10))).join(', ')})`} → kho
+            </div>
+          </div>
           {bagsApproved && <div className="tzs-note ok">Bạn trực Trạm Z: {bagsApproved}</div>}
         </>
       ) : (

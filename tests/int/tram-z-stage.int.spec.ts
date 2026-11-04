@@ -7,7 +7,7 @@ import { finalColumns } from '../../src/components/tram-z-stage/FinalScreen'
 import { clockOf } from '../../src/components/tram-z-stage/format'
 import { SCENES, TOOL_LABELS } from '../../src/components/tram-z-stage/roster'
 import { applyEvent, initialState } from '../../src/components/tram-z-stage/state'
-import { CARD_MS, buildSchedule, parseJsonl, slotAt } from '../../src/components/tram-z-stage/timeline'
+import { CARD_MS, SLOW_PACE, buildSchedule, parseJsonl, slotAt } from '../../src/components/tram-z-stage/timeline'
 import type { Headcount } from '../../src/components/tram-z-stage/types'
 
 const { events } = parseJsonl(readFileSync(path.resolve(__dirname, '../../public/demo/events.jsonl'), 'utf8'))
@@ -23,6 +23,14 @@ describe('tram-z-stage timeline', () => {
     expect(slotAt(sch.scenes, first.start + first.ms - 1)?.holding).toBe(false)
     expect(slotAt(sch.scenes, first.start + first.ms + 1)?.holding).toBe(true)
     expect(slotAt(sch.scenes, sch.scenes[1].start)?.slot.scene).toBe('dang_ban')
+  })
+
+  it('slow pace stretches scenes and holds cards for 8 s, for a presenter', () => {
+    const sch = buildSchedule(events, { pace: 'slow' })
+    const play = SCENES.reduce((n, s) => n + Math.round(s.ms * SLOW_PACE.mult), 0)
+    expect(sch.pace).toBe('slow')
+    expect(sch.total).toBe(play + SCENES.length * SLOW_PACE.cardMs)
+    expect(buildSchedule(events, { pace: 'slow', brief: true }).total).toBe(30000)
   })
 
   it('brief mode is the 30-second version without cards', () => {
@@ -57,6 +65,11 @@ describe('tram-z-stage state', () => {
   it('ends with the counters of the last metric line', () => {
     const lastMetric = [...events].reverse().find((e) => e.type === 'metric')
     expect(final.metrics).toMatchObject(lastMetric?.metrics ?? {})
+    // the agent cards' own counts add up to the metric (the closing read-out is not agent work)
+    const perCard = Object.values(final.agents).reduce((n, a) => n + a.actions, 0)
+    expect(perCard).toBe(lastMetric?.metrics?.agent_actions)
+    const closing = [...events].reverse().find((e) => e.type === 'say' && e.detail?.auto)
+    expect(closing?.text).toContain(String(lastMetric?.metrics?.agent_actions))
   })
 
   it('stamps the refused listing, keeps the OCOP badge and reads the 10% split 5/2/1/2', () => {
@@ -74,6 +87,12 @@ describe('tram-z-stage state', () => {
     expect(final.lots.length).toBe(6)
     expect(final.lots.some((l) => l.replaced)).toBe(true)
     expect(final.route?.legs.some((l) => l.dropBags === 30)).toBe(true)
+    expect(final.route?.parcels.length).toBe(2)
+    expect(final.route?.laundry.length).toBe(3)
+    expect(final.route?.legs.some((l) => (l.bringBackParcels ?? 0) > 0 && (l.bringBack ?? 0) > 0)).toBe(true)
+    expect(final.houseBaskets.map((h) => h.house)).toEqual([1, 2, 3, 4, 5])
+    expect(final.houseBaskets.reduce((n, h) => n + h.households, 0)).toBe(30)
+    expect(final.listings.filter((l) => l.label).length).toBeGreaterThanOrEqual(1)
     expect(final.route?.at).toBe(final.route!.legs.length - 1)
     expect(final.payments.reduce((n, p) => n + p.orders, 0)).toBe(30)
     expect(final.thread.map((t) => t.kind)).toEqual(['customer', 'tool', 'tool', 'request', 'approve', 'answer'])
@@ -106,6 +125,9 @@ describe('tram-z-stage conclusions', () => {
     expect(conclusionOf('dat_gio', events)!.numbers[0]).toEqual({ label: 'Giỏ đặt', value: '30' })
     expect(conclusionOf('doi_soat', events)!.numbers[1].value).toBe('322.800 đ')
     expect(conclusionOf('ra_tram', events)!.numbers[1].value).toBe('30')
+    expect(conclusionOf('ra_tram', events)!.summary).toMatch(/đi đầy, về không rỗng.*30 túi.*3 túi giặt \+ 2 bưu phẩm/)
+    expect(conclusionOf('dat_gio', events)!.summary).toMatch(/30 Giỏ của 30 hộ → 1 phiếu gom, 11 mặt hàng, 5 nhà cung cấp; thiếu 2 cải ngọt → thay rau muống, bạn trực Trạm Z duyệt, 2 hộ được báo/)
+    for (const s of SCENES) if (s.code !== 'tong_ket') expect(conclusionOf(s.code, events)!.numbers.length).toBeLessThanOrEqual(5)
     expect(conclusionOf('tong_ket', events)!.numbers[0].value).toBe('30')
     expect(conclusionOf('dang_ban', events)!.approvals.length).toBe(1)
   })
@@ -130,6 +152,10 @@ describe('tram-z-stage final screen', () => {
       expect(agents.total).toBe(agents.peopleCost + agents.agentCost)
       expect(saving).toBe(manual.total - agents.total)
       expect(agents.agents).toBe(6)
+      // the office / physical split is in the file and adds up to the totals
+      expect(b.office!.manual_people + b.physical!.people).toBeCloseTo(b.manual_people, 1)
+      expect(b.office!.with_agents_people + b.physical!.people).toBeCloseTo(b.with_agents_people, 1)
+      expect(b.office!.with_agents_minutes).toBeLessThan(b.office!.manual_minutes)
     }
   })
 })

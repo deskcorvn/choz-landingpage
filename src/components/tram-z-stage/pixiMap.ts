@@ -410,6 +410,7 @@ interface Mover {
   bag: Graphics | null
   cargo: Graphics | null
   laundry: Graphics | null
+  parcels: Graphics | null
   node: string
   loc: string | null
   pos: Pt
@@ -421,6 +422,7 @@ interface Mover {
   anim: number
   onArrive: (() => void) | null
   laundryBags: number
+  parcelCount: number
   bags: number
 }
 
@@ -445,6 +447,7 @@ function makePerson(sprite: string): Mover {
     bag,
     cargo: null,
     laundry: null,
+    parcels: null,
     node: home.node,
     loc: null,
     pos: { ...home.at },
@@ -456,6 +459,7 @@ function makePerson(sprite: string): Mover {
     anim: 0,
     onArrive: null,
     laundryBags: 0,
+    parcelCount: 0,
     bags: 0,
   }
 }
@@ -495,7 +499,14 @@ function makeVan(): Mover {
     laundry.rect(-45 + (4 + k * 6) * P, -45 - 2 * P, 3 * P, 1 * P).fill('#7dd3fc')
   }
   laundry.visible = false
-  c.addChild(body, cargo, laundry)
+  // parcels: two brown boxes with a tape stripe, behind the laundry on the roof
+  const parcels = new Graphics()
+  for (let k = 0; k < 2; k++) {
+    parcels.rect(-45 + (21 + k * 4) * P, -45 - 2 * P, 3 * P, 3 * P).fill('#a16207')
+    parcels.rect(-45 + (22 + k * 4) * P, -45 - 2 * P, 1 * P, 3 * P).fill('#fef3c7')
+  }
+  parcels.visible = false
+  c.addChild(body, cargo, laundry, parcels)
   const home = homeSpot('xe1')
   return {
     sprite: 'xe1',
@@ -504,6 +515,7 @@ function makeVan(): Mover {
     bag: null,
     cargo,
     laundry,
+    parcels,
     node: home.node,
     loc: 'loc_kho',
     pos: { ...home.at },
@@ -515,6 +527,7 @@ function makeVan(): Mover {
     anim: 0,
     onArrive: null,
     laundryBags: 0,
+    parcelCount: 0,
     bags: 0,
   }
 }
@@ -650,6 +663,7 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
   const refreshVan = (m: Mover) => {
     if (m.cargo) m.cargo.visible = m.bags > 0
     if (m.laundry) m.laundry.visible = m.laundryBags > 0
+    if (m.parcels) m.parcels.visible = m.parcelCount > 0
   }
 
   const api: TramMap = {
@@ -673,8 +687,10 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
         if (sprite === 'xe1') {
           const bags = Number(ev.detail?.bags ?? 0)
           const laundry = Number(ev.detail?.laundry_bags ?? 0)
+          const parcels = Number(ev.detail?.parcels ?? 0)
           if (bags > 0) m.bags = bags
           if (laundry > 0) m.laundryBags = laundry
+          if (parcels > 0) m.parcelCount = parcels
           if (bags > 0 && ev.loc === 'loc_tram')
             onArrive = () => {
               tramBags += m.bags
@@ -682,10 +698,11 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
               refreshVan(m)
               drawShelf()
             }
-          if (ev.loc === 'loc_kho' && m.laundryBags > 0)
+          if (ev.loc === 'loc_kho' && (m.laundryBags > 0 || m.parcelCount > 0))
             onArrive = () => {
               if (instant) {
                 m.laundryBags = 0
+                m.parcelCount = 0
                 refreshVan(m)
               } else laundryHold = 1500
             }
@@ -713,6 +730,7 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
         laundryHold -= dt
         if (laundryHold <= 0) {
           movers.xe1.laundryBags = 0
+          movers.xe1.parcelCount = 0
           refreshVan(movers.xe1)
         }
       }
@@ -748,8 +766,9 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
     },
     vanTag() {
       const m = movers.xe1
-      if (!m || m.laundryBags <= 0) return null
-      return { x: m.pos.x, y: m.pos.y - 58, text: `${m.laundryBags} túi đồ giặt` }
+      if (!m || (m.laundryBags <= 0 && m.parcelCount <= 0)) return null
+      const parts = [m.laundryBags > 0 ? `${m.laundryBags} túi giặt` : '', m.parcelCount > 0 ? `${m.parcelCount} bưu phẩm` : '']
+      return { x: m.pos.x, y: m.pos.y - 58, text: parts.filter(Boolean).join(' + ') }
     },
     reset() {
       for (const m of Object.values(movers)) {
@@ -761,6 +780,7 @@ export async function createTramMap(host: HTMLElement, resolution = 1): Promise<
         m.pos = { ...home.at }
         m.bags = 0
         m.laundryBags = 0
+        m.parcelCount = 0
         if (m.bag) m.bag.visible = false
         if (m.frames) {
           m.frames[0].visible = true

@@ -88,6 +88,12 @@ export interface HeadcountBlock {
   total_cost_vnd_month_with_agents?: number
   saving_vnd_month?: number
   wage_source?: string
+  manual_minutes?: number
+  with_agents_minutes?: number
+  /** paperwork and coordination (what agents can do) */
+  office?: { manual_minutes: number; with_agents_minutes: number; manual_people: number; with_agents_people: number }
+  /** physical work, the same minutes on both sides */
+  physical?: { minutes: number; people: number; note?: string }
   [key: string]: unknown
 }
 

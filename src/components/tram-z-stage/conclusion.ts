@@ -78,7 +78,7 @@ function datGio(evs: StageEvent[]): Conclusion {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shortRows: any[] = pick?.short ?? []
   const shortText = shortRows.length
-    ? andList(shortRows.map((x) => `thiếu ${x.missing} ${String(x.name).toLowerCase()}${x.suggest ? `, thay ${String(x.suggest.name).toLowerCase()}` : ''}`))
+    ? andList(shortRows.map((x) => `thiếu ${x.missing} ${String(x.name).toLowerCase()}${x.suggest ? ` → thay ${String(x.suggest.name).toLowerCase()}` : ''}`))
     : 'không thiếu món nào'
   const changed = Array.isArray(sub?.orders) ? sub.orders.length : 0
   const steps: ConclusionStep[] = [
@@ -91,8 +91,8 @@ function datGio(evs: StageEvent[]): Conclusion {
   return {
     scene: 'dat_gio',
     kicker: 'Kết luận bước 1',
-    title: 'Gom đơn: 30 Giỏ của khách thành một phiếu gom',
-    summary: `Khách chỉ bấm đặt Giỏ. Agent Chia đơn đọc hết, cộng lại thành phiếu gom theo mặt hàng và nhà cung cấp, phát hiện chỗ thiếu và chỉ hỏi người khi phải đổi hàng cho khách.`,
+    title: `Gom đơn: ${fmtInt(booked)} Giỏ của ${fmtInt(booked)} hộ thành một phiếu gom`,
+    summary: `${fmtInt(booked)} Giỏ của ${fmtInt(booked)} hộ → 1 phiếu gom, ${fmtInt(items)} mặt hàng, ${fmtInt(suppliers)} nhà cung cấp; ${shortText}${changed ? `, bạn trực Trạm Z duyệt, ${fmtInt(changed)} hộ được báo` : ''}.`,
     steps,
     handoffs: h,
     approvals: approvalsOf(evs),
@@ -184,23 +184,25 @@ function raTram(evs: StageEvent[]): Conclusion {
   const bags = Number(route?.bags ?? tram?.drop_bags ?? 0)
   const stations = Number(route?.stations ?? 1)
   const nLaundry = Number(laundry?.count ?? route?.laundry_households?.length ?? 0)
+  const nParcels = Number(laundry?.parcel_count ?? route?.parcel_households?.length ?? 0)
   const steps: ConclusionStep[] = [
-    { who: 'ag_giao_nhan', did: `từ phiếu gom lên lộ trình: xe rời kho ${route?.depart ?? ''}, tới Trạm Z ${tram?.arrive ?? ''} giao ${fmtInt(bags)} túi cho ${fmtInt(bags)} đơn, chuyến về gom đồ giặt ${nLaundry} hộ, về kho ${back?.arrive ?? ''}` },
-    { who: 'xe1', did: 'chạy đúng lộ trình; xe không chạy rỗng chiều về' },
-    { who: 'hu_tram', did: `ký nhận ${fmtInt(bags)} túi tại trạm` },
+    { who: 'ag_giao_nhan', did: `từ phiếu gom lên lộ trình: rời kho ${route?.depart ?? ''}, tới Trạm Z ${tram?.arrive ?? ''} giao ${fmtInt(bags)} túi cho ${fmtInt(bags)} đơn; chiều về gom ${fmtInt(nLaundry)} túi giặt + ${fmtInt(nParcels)} bưu phẩm, về kho ${back?.arrive ?? ''}` },
+    { who: 'xe1', did: 'chạy đúng lộ trình: chiều đi chở túi hàng, chiều về chở đồ giặt và bưu phẩm' },
+    { who: 'hu_tram', did: `ký nhận ${fmtInt(bags)} túi tại trạm, giao đồ giặt và bưu phẩm cho xe` },
   ]
   return {
     scene: 'ra_tram',
     kicker: 'Kết luận bước 4',
-    title: 'Giao hàng: một chuyến xe, lộ trình agent lên sẵn',
-    summary: `Có bao nhiêu đơn, bao nhiêu trạm thì agent lên lộ trình bấy nhiêu điểm dừng, kèm giờ tới và số túi mỗi trạm. Người chỉ lái xe và ký nhận.`,
+    title: 'Giao hàng: xe đi đầy, về không rỗng',
+    summary: `Xe đi đầy, về không rỗng: chiều đi ${fmtInt(bags)} túi, chiều về ${fmtInt(nLaundry)} túi giặt + ${fmtInt(nParcels)} bưu phẩm. Có bao nhiêu đơn, bao nhiêu trạm thì agent lên bấy nhiêu điểm dừng, kèm giờ tới và số túi mỗi trạm.`,
     steps,
     handoffs: handoffsOf(evs),
     approvals: approvalsOf(evs),
     numbers: [
       { label: 'Trạm trên lộ trình', value: fmtInt(stations) },
-      { label: 'Túi giao', value: fmtInt(bags) },
-      { label: 'Đồ giặt gom về', value: `${fmtInt(nLaundry)} hộ` },
+      { label: 'Túi giao chiều đi', value: fmtInt(bags) },
+      { label: 'Túi giặt gom chiều về', value: fmtInt(nLaundry) },
+      { label: 'Bưu phẩm gom chiều về', value: fmtInt(nParcels) },
       { label: 'Giờ tới trạm', value: tram?.arrive ?? '—' },
     ],
     models: modelsOf(evs),
@@ -273,9 +275,10 @@ function tongKet(evs: StageEvent[], all: StageEvent[]): Conclusion {
   const last = [...all].reverse().find((e) => e.type === 'metric')?.metrics ?? {}
   const perAgent = AGENT_CODES.map((code) => ({
     code,
-    n: all.filter((e) => (e.type === 'tool' || e.type === 'say') && e.from === code).length,
+    // the closing read-out (detail.auto) is not agent work; the counts add up to the last metric line
+    n: all.filter((e) => (e.type === 'tool' || (e.type === 'say' && !e.detail?.auto)) && e.from === code).length,
   }))
-  const say = evs.find((e) => e.type === 'say' && e.from === 'ag_doi_soat')
+  const say = evs.find((e) => e.type === 'say' && e.detail?.auto) ?? evs.find((e) => e.type === 'say' && e.from === 'ag_doi_soat')
   const steps: ConclusionStep[] = perAgent.map((a) => ({ who: a.code, did: `${fmtInt(a.n)} việc` }))
   return {
     scene: 'tong_ket',

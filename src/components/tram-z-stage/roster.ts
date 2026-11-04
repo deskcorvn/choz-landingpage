@@ -11,7 +11,7 @@ export const AGENTS: AgentInfo[] = [
   { code: 'ag_dang_ban', name: 'Đăng bán', provider: 'meta', role: 'Nghe người bán nói, nhìn ảnh, viết tin bán' },
   { code: 'ag_kiem_chung', name: 'Kiểm chứng', provider: 'meta', role: 'Đối chiếu tin với ảnh, kiểm lô hàng' },
   { code: 'ag_chia_don', name: 'Chia đơn', provider: 'claude', role: 'Gom Giỏ khách đặt thành phiếu gom' },
-  { code: 'ag_giao_nhan', name: 'Giao nhận', provider: 'claude', role: 'Lên lộ trình xe, gom đồ giặt' },
+  { code: 'ag_giao_nhan', name: 'Giao nhận', provider: 'claude', role: 'Lên lộ trình xe; chiều về gom đồ giặt, bưu phẩm' },
   { code: 'ag_cham_khach', name: 'Chăm khách', provider: 'claude', role: 'Trả lời khách, đề xuất đổi trả' },
   { code: 'ag_doi_soat', name: 'Đối soát', provider: 'claude', role: 'Khớp đơn, tính phí, báo tiền cho nhà cung cấp' },
 ]
@@ -27,7 +27,7 @@ export const TOOL_LABELS: Record<string, string> = {
   make_picklist: 'lập phiếu gom',
   apply_substitution: 'thay hàng thiếu',
   plan_route: 'lên lộ trình xe',
-  laundry_pickups: 'gom đồ giặt',
+  laundry_pickups: 'gom đồ giặt, bưu phẩm chiều về',
   check_lot: 'kiểm lô hàng',
   order_of: 'tra đơn của hộ',
   return_policy: 'đọc chính sách đổi trả',
@@ -139,7 +139,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'ra_tram',
     short: 'Ra trạm',
-    title: 'Xe ra Trạm Z, chuyến về gom đồ giặt',
+    title: 'Xe chở túi ra Trạm Z, chiều về gom đồ giặt, bưu phẩm',
     ms: 7000,
     briefMs: 4000,
     flow: ['ag_giao_nhan', 'xe1', 'hu_tram'],
@@ -178,6 +178,7 @@ export const APPROVAL_KIND: Record<string, string> = {
 export const SERVICE_LABELS: Record<string, (n: number) => string> = {
   suat_an_sang: (n) => `${n} suất ăn sáng`,
   giat_la_ho: (n) => `${n} hộ giặt là`,
+  buu_pham: (n) => `${n} bưu phẩm`,
 }
 
 /** Names of the goods in picklists and lots (sku → Vietnamese), for boards that only get a code. */

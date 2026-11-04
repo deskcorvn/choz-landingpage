@@ -10,6 +10,8 @@ import type { StageEvent } from './types'
 export const DEFAULT_SCENE_MS = 4000
 /** How long each scene's conclusion card stays on screen. */
 export const CARD_MS = 5000
+/** ?pace=slow, for a presenter talking over the stage: longer scenes, longer cards. */
+export const SLOW_PACE = { mult: 1.6, cardMs: 8000 }
 /** Live mode: never fire two events closer than this on stage. */
 export const LIVE_GAP_MS = 180
 
@@ -29,13 +31,16 @@ export interface Schedule {
   scenes: SceneSlot[]
   total: number
   brief: boolean
+  pace: 'normal' | 'slow'
 }
 
 export interface ScheduleOptions {
   /** the 30-second version: short scenes, no conclusion cards */
   brief?: boolean
-  /** conclusion card hold per scene (default CARD_MS) */
+  /** conclusion card hold per scene (default CARD_MS, or SLOW_PACE.cardMs when pace is slow) */
   cardMs?: number
+  /** slow: every scene ×SLOW_PACE.mult and cards of SLOW_PACE.cardMs (ignored in brief mode) */
+  pace?: 'normal' | 'slow'
 }
 
 const sceneMs = (code: string, brief: boolean) => {
@@ -46,7 +51,8 @@ const sceneMs = (code: string, brief: boolean) => {
 
 export function buildSchedule(events: StageEvent[], opts: ScheduleOptions = {}): Schedule {
   const brief = !!opts.brief
-  const hold = brief ? 0 : (opts.cardMs ?? CARD_MS)
+  const slow = !brief && opts.pace === 'slow'
+  const hold = brief ? 0 : (opts.cardMs ?? (slow ? SLOW_PACE.cardMs : CARD_MS))
   const at: number[] = new Array(events.length).fill(0)
   const scenes: SceneSlot[] = []
 
@@ -61,7 +67,7 @@ export function buildSchedule(events: StageEvent[], opts: ScheduleOptions = {}):
 
   let cursor = 0
   for (const g of groups) {
-    const ms = sceneMs(g.scene, brief)
+    const ms = Math.round(sceneMs(g.scene, brief) * (slow ? SLOW_PACE.mult : 1))
     scenes.push({ scene: g.scene, start: cursor, ms, hold })
     const first = events[g.idx[0]]
     const rest = first.type === 'scene' ? g.idx.slice(1) : g.idx
@@ -81,7 +87,7 @@ export function buildSchedule(events: StageEvent[], opts: ScheduleOptions = {}):
     }
     cursor += ms + hold
   }
-  return { at, scenes, total: cursor, brief }
+  return { at, scenes, total: cursor, brief, pace: slow ? 'slow' : 'normal' }
 }
 
 /** The scene slot whose play or hold contains the playhead, and whether the playhead is in its hold. */

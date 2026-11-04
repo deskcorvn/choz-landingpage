@@ -4,8 +4,8 @@
  * "Một ngày của Trạm Z": one simulated day replayed scene by scene for a 1920×1080 projector. Each scene plays its
  * events, then holds on a conclusion card; the final screen compares people-only with people + agents.
  * Sources: ?src=/demo/events.jsonl (default) replays a file, ?ws=ws://localhost:8765 adds events live.
- * ?brief=1 is the 30-second version without conclusion cards. headcount.json and summary.json are read from the
- * same folder (?data= overrides). No API calls.
+ * ?brief=1 is the 30-second version without conclusion cards; ?pace=slow stretches scenes and cards for a presenter.
+ * headcount.json and summary.json are read from the same folder (?data= overrides). No API calls.
  */
 import './stage.css'
 
@@ -129,6 +129,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   const [paused, setPaused] = useState(false)
   const [slow, setSlow] = useState(false)
   const [brief, setBrief] = useState(false)
+  const [pace, setPace] = useState<'normal' | 'slow'>('normal')
   const [progress, setProgress] = useState(0)
   const [logOpen, setLogOpen] = useState(false)
   const [final, setFinal] = useState<null | { manual: boolean }>(null)
@@ -154,6 +155,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   const speedRef = useRef(1)
   const liveRef = useRef(false)
   const briefRef = useRef(false)
+  const paceRef = useRef<'normal' | 'slow'>('normal')
   const autoplayRef = useRef(false)
   const finalShownRef = useRef(false)
   const tongKetAtRef = useRef<number | null>(null)
@@ -167,7 +169,7 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
   /* ------------------------------------------------------------ playback controls */
 
   const setSchedule = useCallback((events: StageEvent[]) => {
-    const sch = buildSchedule(events, { brief: briefRef.current })
+    const sch = buildSchedule(events, { brief: briefRef.current, pace: paceRef.current })
     atRef.current = sch.at
     totalRef.current = sch.total
     scenesRef.current = sch.scenes
@@ -267,6 +269,18 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     seek(slots[back].start)
   }, [seek])
 
+  /** "Chậm hơn": longer scenes and 8-second cards; the current scene restarts with the new timing. */
+  const togglePace = useCallback(() => {
+    paceRef.current = paceRef.current === 'slow' ? 'normal' : 'slow'
+    setPace(paceRef.current)
+    const here = slotAt(scenesRef.current, playheadRef.current)
+    setSchedule(eventsRef.current)
+    if (startedRef.current && !liveRef.current) {
+      const slot = here ? scenesRef.current[here.index] : null
+      if (slot) seek(slot.start)
+    }
+  }, [seek, setSchedule])
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen?.().catch(() => undefined)
@@ -293,6 +307,8 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
     const id = requestAnimationFrame(() => {
       briefRef.current = q.get('brief') === '1'
       setBrief(briefRef.current)
+      paceRef.current = q.get('pace') === 'slow' ? 'slow' : 'normal'
+      setPace(paceRef.current)
       if (ws) {
         liveRef.current = true
         autoplayRef.current = auto !== '0'
@@ -596,6 +612,11 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
             <Btn on={slow} onClick={toggleSlow} title="Chậm ×3">
               ×3
             </Btn>
+            {!brief && (
+              <Btn on={pace === 'slow'} onClick={togglePace} title="Chậm hơn: cảnh dài hơn, thẻ kết luận 8 giây (để vừa chiếu vừa nói)">
+                Chậm hơn
+              </Btn>
+            )}
             <Btn onClick={restart} title="Chạy lại">
               <IconRestart />
             </Btn>
@@ -628,10 +649,11 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
           <div className="tzs-van-tag" ref={vanTagRef} />
           {scene && !card && <FlowStrip scene={scene} lastActor={st.lastActor} activeAgents={activeAgents} />}
           <AnimatePresence>
-            {!card && st.scene === 'dat_gio' && (st.baskets || st.picklist) && (
+            {!card && st.scene === 'dat_gio' && (st.baskets || st.picklist || st.houseBaskets.length > 0) && (
               <BasketPanel
                 key="baskets"
                 baskets={st.baskets}
+                houses={st.houseBaskets}
                 picklist={st.picklist}
                 substitution={st.substitution}
                 notes={st.householdNotes}

@@ -66,6 +66,7 @@ export function Bubbles({ bubbles, slow }: { bubbles: Bubble[]; slow: number }) 
                 >
                   <div className="tzs-bubble-who">{speakerLabel(b.who, b.to)}</div>
                   <div className="tzs-bubble-text">{b.text}</div>
+                  {b.label && <div className="tzs-bubble-label">{b.label}</div>}
                 </motion.div>
               </div>
             </div>
