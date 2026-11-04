@@ -154,10 +154,10 @@ export function BasketPanel({
 
 const verdictLabel = (l: Listing) => {
   if (!l.verdict) return { cls: '', text: 'Đang đối chiếu với ảnh…' }
-  const detail = l.verdictText?.replace(/^(pass|warn|block)\s*:\s*/i, '') ?? ''
-  const n = detail.match(/(\d+)\s*claim/)?.[1]
+  const detail = l.verdictText?.replace(/^(pass|warn|block|khớp ảnh|có chỗ lệch|không đăng)\s*:\s*/i, '') ?? ''
+  const n = detail.match(/(\d+)\s*(?:claim|điểm)/)?.[1]
   const bad = detail.match(/(\d+)\s*lệch/)?.[1]
-  const counts = n ? `${n} điểm kiểm${bad && Number(bad) > 0 ? `, ${bad} lệch` : ''}` : detail
+  const counts = n ? `${n} điểm đối chiếu${bad && Number(bad) > 0 ? `, ${bad} lệch` : ''}` : detail
   if (l.verdict === 'pass') return { cls: 'pass', text: `Khớp ảnh · ${counts}` }
   if (l.verdict === 'warn') return { cls: 'warn', text: `Có chỗ lệch · ${counts}` }
   return { cls: 'block', text: 'Không được bán trên Chợ Z' }
@@ -167,7 +167,7 @@ const verdictLabel = (l: Listing) => {
 export function ListingPanel({ listings, slow }: { listings: Listing[]; slow: number }) {
   const shown = listings.slice(-4)
   return (
-    <Panel title="Tin đăng sáng nay" sub="agent Đăng bán viết tin · agent Kiểm chứng đối chiếu ảnh, nhãn, quy định" pos={{ left: 24, top: 428, width: 1104 }} slow={slow}>
+    <Panel title="Tin đăng sáng nay" sub="agent Đăng bán viết tin · agent Kiểm chứng đối chiếu với ảnh, nhãn và quy định bán hàng" pos={{ left: 24, top: 428, width: 1104 }} slow={slow}>
       <div className={`tzs-listings n${shown.length}`}>
         <AnimatePresence>
           {shown.map((l) => {
@@ -304,7 +304,7 @@ const THREAD_WHO: Record<ThreadLine['kind'], string> = {
   tool: 'Agent tra cứu',
   agent: 'Agent',
   request: 'Agent xin duyệt',
-  approve: 'Bạn trực trạm',
+  approve: 'Bạn trực Trạm Z',
   answer: 'Agent trả lời khách',
 }
 

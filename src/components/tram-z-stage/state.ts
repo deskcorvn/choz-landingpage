@@ -399,9 +399,9 @@ function findListing(listings: Listing[], ev: StageEvent, pred?: (l: Listing) =>
 
 const verdictOf = (summary: string): Listing['verdict'] => {
   const s = summary.toLowerCase()
-  if (s.startsWith('block')) return 'block'
-  if (s.startsWith('warn')) return 'warn'
-  if (s.startsWith('pass')) return 'pass'
+  if (s.startsWith('block') || s.startsWith('không đăng')) return 'block'
+  if (s.startsWith('warn') || s.startsWith('có chỗ lệch')) return 'warn'
+  if (s.startsWith('pass') || s.startsWith('khớp ảnh')) return 'pass'
   return null
 }
 

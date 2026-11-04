@@ -1646,7 +1646,6 @@
 .tzs-lot-name {
   font-size: 23px;
   font-weight: 800;
-  text-transform: capitalize;
 }
 
 .tzs-lot-name span {
@@ -2221,7 +2220,6 @@
 
 .tzs-col-row .role {
   font-weight: 650;
-  text-transform: capitalize;
 }
 
 .tzs-col-row .job {

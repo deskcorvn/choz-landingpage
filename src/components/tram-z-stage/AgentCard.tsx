@@ -3,7 +3,7 @@
 import { memo } from 'react'
 
 import { fmtMs } from './format'
-import { toolLabel, type AgentInfo } from './roster'
+import { summaryLabel, toolLabel, type AgentInfo } from './roster'
 import type { AgentState } from './state'
 
 function AgentCardBase({ info, s, active, top, height }: { info: AgentInfo; s: AgentState; active: boolean; top: number; height: number }) {
@@ -24,7 +24,7 @@ function AgentCardBase({ info, s, active, top, height }: { info: AgentInfo; s: A
         {s.tool ? (
           <div className={`tzs-card-task ${s.ok ? '' : 'fail'}`}>
             <b className="tzs-card-doing">{toolLabel(s.tool)}</b>
-            <span className="tzs-card-out">{s.summary}</span>
+            <span className="tzs-card-out">{summaryLabel(s.summary)}</span>
             <code>{s.tool}</code>
           </div>
         ) : (

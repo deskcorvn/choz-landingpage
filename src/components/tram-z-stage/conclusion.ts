@@ -127,7 +127,7 @@ function dangBan(evs: StageEvent[]): Conclusion {
     scene: 'dang_ban',
     kicker: 'Kết luận bước 2',
     title: 'Đăng bán: nói một câu, có tin bán đã được kiểm',
-    summary: `Agent viết tin từ ảnh và lời nói, rồi một agent khác đối chiếu từng ý với ảnh. Tin lệch phải có người duyệt; mặt hàng không được bán bị từ chối ngay, không ai phải xem.`,
+    summary: `Agent viết tin từ ảnh và lời nói, rồi một agent khác đối chiếu từng ý với ảnh. Tin lệch phải có người duyệt; mặt hàng Chợ Z không bán bị từ chối ngay, không cần người xem.`,
     steps,
     handoffs: handoffsOf(evs),
     approvals: approvalsOf(evs),
@@ -148,7 +148,8 @@ function gomKho(evs: StageEvent[]): Conclusion {
   for (const c of checks) byKey.set(`${c.detail!.output.supplier}:${c.detail!.output.item}`, c)
   const lots = Array.from(byKey.values())
   const rejectedFirst = checks.filter((c) => c.detail!.output.result === 'loại')
-  const rejected = rejectedFirst.map((c) => `${LOT_NAMES[c.detail!.output.item] ?? c.detail!.output.item} (${actorName(c.detail!.output.supplier)}: ${c.detail!.output.reasons?.[0] ?? ''})`)
+  const viNum = (t: string) => t.replace(/(\d)\.(\d)/g, '$1,$2')
+  const rejected = rejectedFirst.map((c) => `${LOT_NAMES[c.detail!.output.item] ?? c.detail!.output.item} (${actorName(c.detail!.output.supplier)}: ${viNum(c.detail!.output.reasons?.[0] ?? '')})`)
   const passedNow = lots.filter((c) => c.detail!.output.result === 'đạt').length
   const steps: ConclusionStep[] = [
     { who: 'ag_giao_nhan', did: 'báo chủ kho hôm nay gom những gì, bao nhiêu' },
@@ -218,7 +219,7 @@ function nhanHang(evs: StageEvent[]): Conclusion {
   ]
   if (question) {
     steps.push({ who: question.from ?? 'ho', did: `hỏi: “${question.text}”` })
-    steps.push({ who: 'ag_cham_khach', did: `${andList(toolsUsed(evs, 'ag_cham_khach'))}, đề xuất cách xử lý rồi xin người trực trạm duyệt` })
+    steps.push({ who: 'ag_cham_khach', did: `${andList(toolsUsed(evs, 'ag_cham_khach'))}, đề xuất cách xử lý rồi xin bạn trực Trạm Z duyệt` })
     if (answer) steps.push({ who: 'hu_tram', did: `duyệt; agent trả lời khách: “${answer.text}”` })
   }
   return {
@@ -279,7 +280,7 @@ function tongKet(evs: StageEvent[], all: StageEvent[]): Conclusion {
   return {
     scene: 'tong_ket',
     kicker: 'Kết luận cả ngày',
-    title: 'Một ngày của Trạm Z: máy làm phần lặp, người duyệt phần có tiền và có khách',
+    title: 'Một ngày của Trạm Z: agent làm phần lặp, người duyệt phần có tiền và có khách',
     summary: say?.text ?? '',
     steps,
     handoffs: all.filter((e) => e.type === 'handoff' && e.from && e.to).map((e) => ({ from: e.from!, to: e.to!, text: e.text ?? '' })),

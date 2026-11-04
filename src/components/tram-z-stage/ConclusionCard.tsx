@@ -37,7 +37,7 @@ export function ConclusionCard({ c, slow, brief }: { c: Conclusion; slow: number
         </div>
         {c.models.length > 0 && (
           <div className="tzs-conclusion-models">
-            Model đã chạy: {c.models.join(' · ')}
+            Mô hình AI đã chạy: {c.models.join(' · ')}
           </div>
         )}
       </div>

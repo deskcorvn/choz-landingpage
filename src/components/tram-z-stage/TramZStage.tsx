@@ -114,7 +114,7 @@ function ModeBadge({ mode, ws, wsState }: { mode: string | null; ws: boolean; ws
     return (
       <div className="tzs-mode mock">
         <div className="tzs-mode-main">DỮ LIỆU MẪU</div>
-        <div className="tzs-mode-sub">chưa gọi model thật</div>
+        <div className="tzs-mode-sub">chưa chạy AI thật</div>
       </div>
     )
   return <div className="tzs-mode" />
@@ -599,9 +599,9 @@ export default function TramZStage({ defaultSrc = '/demo/events.jsonl', logoSrc 
             <Btn onClick={restart} title="Chạy lại">
               <IconRestart />
             </Btn>
-            <Btn on={logOpen} onClick={() => setLogOpen((o) => !o)} title="Xem log">
+            <Btn on={logOpen} onClick={() => setLogOpen((o) => !o)} title="Xem log: nhật ký từng sự kiện">
               <IconLog />
-              Xem log
+              Nhật ký
             </Btn>
             <Btn on={!!final} onClick={() => (final ? setFinal(null) : showFinal(true))} title="Bảng người và chi phí: 1 trạm, 50 trạm">
               <IconTable />

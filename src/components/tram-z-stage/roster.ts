@@ -44,6 +44,23 @@ export const TOOL_LABELS: Record<string, string> = {
 }
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? name
 
+/** The app's own step titles are English (app/pipeline.py); the card shows them in Vietnamese. Agent-written text
+ *  is never rewritten here. */
+const SUMMARY_LABELS: [RegExp, (m: RegExpMatchArray) => string][] = [
+  [/^Studio room from cache.*$/i, () => 'dùng phòng chụp có sẵn (Muse Image vẽ từ trước)'],
+  [/^Paint empty studio.*$/i, () => 'vẽ phòng chụp trống (Muse Image)'],
+  [/^Cut out [“"](.+)[”"]$/i, (m) => `tách nền: ${m[1]}`],
+  [/^Compose studio photo.*$/i, () => 'ghép ảnh sản phẩm vào phòng chụp (máy cục bộ)'],
+]
+export function summaryLabel(text: string | null | undefined): string {
+  if (!text) return ''
+  for (const [re, fn] of SUMMARY_LABELS) {
+    const m = text.match(re)
+    if (m) return fn(m)
+  }
+  return text
+}
+
 const SUPPLIER_NAMES: Record<string, string> = {
   ncc1: 'Nhà cung cấp đặc sản 1',
   ncc2: 'HTX rau 2',
@@ -98,7 +115,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'dat_gio',
     short: 'Đặt Giỏ',
-    title: 'Tối hôm trước: khách đặt Giỏ, agent gom thành một phiếu',
+    title: 'Tối hôm trước: khách đặt Giỏ, agent gom đơn',
     ms: 6000,
     briefMs: 4000,
     flow: ['ho', 'ag_chia_don', 'hu_tram', 'ag_giao_nhan'],
@@ -106,7 +123,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'dang_ban',
     short: 'Đăng bán',
-    title: 'Sáng sớm: nhà cung cấp đăng bán bằng giọng nói và ảnh',
+    title: 'Sáng sớm: đăng bán bằng giọng nói và ảnh',
     ms: 10000,
     briefMs: 7000,
     flow: ['ncc', 'ag_dang_ban', 'ag_kiem_chung', 'hu_tram'],
@@ -114,7 +131,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'gom_kho',
     short: 'Về kho',
-    title: 'Hàng về kho: agent kiểm từng lô, chủ kho nhận',
+    title: 'Hàng về kho: agent kiểm từng lô',
     ms: 6000,
     briefMs: 4000,
     flow: ['ag_giao_nhan', 'ncc', 'ag_kiem_chung', 'hu_kho'],
@@ -122,7 +139,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'ra_tram',
     short: 'Ra trạm',
-    title: 'Xe chở túi hàng ra Trạm Z, chuyến về gom đồ giặt',
+    title: 'Xe ra Trạm Z, chuyến về gom đồ giặt',
     ms: 7000,
     briefMs: 4000,
     flow: ['ag_giao_nhan', 'xe1', 'hu_tram'],
@@ -130,7 +147,7 @@ export const SCENES: SceneInfo[] = [
   {
     code: 'nhan_hang',
     short: 'Nhận Giỏ',
-    title: 'Chiều: khách ghé Trạm Z nhận Giỏ, agent chăm khách',
+    title: 'Chiều: khách nhận Giỏ tại Trạm Z',
     ms: 7000,
     briefMs: 5000,
     flow: ['ho', 'hu_tram', 'ag_cham_khach'],

@@ -41,6 +41,8 @@ export function finalColumns(b: HeadcountBlock): { manual: FinalColumn; agents: 
   return { manual, agents, saving: b.saving_vnd_month ?? manual.total - agents.total }
 }
 
+const ucFirst = (t: string) => (t ? t[0].toLocaleUpperCase('vi') + t.slice(1) : t)
+
 function Column({ c, side, delay }: { c: FinalColumn; side: 'manual' | 'agents'; delay: number }) {
   return (
     <motion.div className={`tzs-col ${side}`} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}>
@@ -52,7 +54,7 @@ function Column({ c, side, delay }: { c: FinalColumn; side: 'manual' | 'agents';
       </div>
       {c.roles.map((r, i) => (
         <motion.div key={r.role} className="tzs-col-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: delay + 0.3 + i * 0.12 }}>
-          <span className="role">{r.role}</span>
+          <span className="role">{ucFirst(r.role)}</span>
           <span className="n">{fmtDec(r.people)}</span>
           <span className="vnd">{fmtVnd(r.cost_vnd_month)}</span>
         </motion.div>
@@ -84,7 +86,7 @@ function Column({ c, side, delay }: { c: FinalColumn; side: 'manual' | 'agents';
           </div>
         </>
       ) : (
-        <div className="tzs-col-none">Không có agent · mọi việc giấy tờ làm tay</div>
+        <div className="tzs-col-none">Không có agent · mọi việc giấy tờ, tính toán làm tay</div>
       )}
       <div className="tzs-col-total">
         <span>Tổng mỗi tháng</span>
@@ -115,7 +117,7 @@ function Page({ block, label }: { block: HeadcountBlock; label: string }) {
       <motion.div className="tzs-final-diff" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2.2, duration: 0.5 }}>
         <div className="tzs-diff-item">
           <div className="val">{fmtVnd(saving)}</div>
-          <div className="lbl">ít hơn mỗi tháng khi có đội agent</div>
+          <div className="lbl">ít hơn mỗi tháng khi có đội agent (theo định mức và lương giả định)</div>
         </div>
         <div className="tzs-diff-item">
           <div className="val">{fmtPct(block.human_minutes_saved_pct)}</div>
