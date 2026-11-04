@@ -328,8 +328,10 @@ export function centralLines(c: HeadcountView['central_50']): { kind: string; ti
   }).filter((g) => g.lines.length > 0)
 }
 
-function Cell({ r }: { r: TeamRow | null }) {
-  if (!r) return <><span className="n dim">—</span><span className="vnd dim">agent làm</span></>
+function Cell({ r, side }: { r: TeamRow | null; side: 'manual' | 'agent' }) {
+  // An empty agent-side cell means the agents do that job; an empty manual-side cell means the job does not exist
+  // without agents (the person who answers for the agents' work).
+  if (!r) return <><span className="n dim">—</span><span className="vnd dim">{side === 'agent' ? 'agent làm' : 'không có'}</span></>
   return (
     <>
       <span className="n">{fmtInt(r.people)}</span>
@@ -374,9 +376,9 @@ function CentralPage({ v }: { v: HeadcountView }) {
             {g.lines.map((l, i) => (
               <motion.div key={l.role} className={`tzs-c50-row ${l.same ? 'same' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + gi * 0.3 + i * 0.07 }}>
                 <span className="role">{ucFirst(l.role)}</span>
-                <span className="side manual"><Cell r={l.manual} /></span>
+                <span className="side manual"><Cell r={l.manual} side="manual" /></span>
                 <span className="eq">{l.same ? '=' : ''}</span>
-                <span className="side agent"><Cell r={l.agent} /></span>
+                <span className="side agent"><Cell r={l.agent} side="agent" /></span>
               </motion.div>
             ))}
           </div>
