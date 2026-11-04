@@ -137,6 +137,34 @@ export interface ViewAssumption {
   source: string
 }
 
+export interface PeopleGroup {
+  key: string
+  label: string
+  manual: number
+  with_agents: number
+  same_both_sides: boolean
+  /** physical work only: the hours turned into people before rounding (for whoever asks) */
+  exact_people?: number | null
+}
+
+export interface PeopleSummary {
+  groups: PeopleGroup[]
+  manual_people: number
+  with_agents_people: number
+  agents: number
+  manual_cost_vnd_month: number
+  with_agents_cost_vnd_month: number
+  manual_cost_trieu: number
+  with_agents_cost_trieu: number
+  fee_pool_trieu: number
+  fee_pool_vnd_month: number
+  within_fee_pool: boolean
+  hours_per_person_month: number
+  headline: string
+  cost_line: string
+  transport_note: string
+}
+
 export interface HeadcountView {
   station: {
     who: string
@@ -179,6 +207,8 @@ export interface HeadcountView {
     /** what the fee leaves for the central team: 4 % of the plan's monthly sales */
     fee_pool?: { gmv_vnd_month: number; pct: number; vnd_month: number; text: string; source: string }
     within_fee_pool?: boolean
+    /** what the comparison screen shows: people (to the half person) and two monthly costs */
+    people_summary?: PeopleSummary
   }
   assumptions?: ViewAssumption[]
   agent_cost_vnd_per_order: number

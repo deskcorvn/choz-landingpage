@@ -3349,3 +3349,128 @@
   font-size: 18px;
   margin: 0;
 }
+
+/* ── final screen, people view: three big lines, a small two-column table, one closing sentence ── */
+.tzs-pp {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+.tzs-pp-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tzs-pp-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 18px;
+  font-weight: 800;
+  color: var(--tzs-ink);
+  line-height: 1.12;
+}
+.tzs-pp-line .lbl {
+  font-size: 44px;
+  color: var(--tzs-grey-2);
+}
+.tzs-pp-line .big {
+  font-size: 120px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.tzs-pp-line.money .big {
+  font-size: 80px;
+}
+.tzs-pp-line .big.manual {
+  color: var(--tzs-grey-2);
+}
+.tzs-pp-line .big.agent {
+  color: var(--tzs-red);
+}
+.tzs-pp-line .arrow {
+  font-size: 72px;
+  color: var(--tzs-grey);
+}
+.tzs-pp-line .fee {
+  font-size: 40px;
+  color: var(--tzs-ink);
+}
+.tzs-pp-line .fee.ok {
+  color: #15803d;
+}
+.tzs-pp-line.money .lbl {
+  font-size: 40px;
+}
+.tzs-pp-tail {
+  font-size: 34px;
+  font-weight: 800;
+  color: var(--tzs-ink);
+}
+.tzs-pp-tail .ok {
+  color: #15803d;
+  font-size: 44px;
+  font-weight: 900;
+}
+.tzs-pp-table {
+  display: grid;
+  grid-template-columns: 1fr 190px 60px 320px;
+  align-items: center;
+  max-width: 1560px;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--tzs-ink);
+  border-top: 2px solid #e5e7eb;
+}
+.tzs-pp-table > div {
+  padding: 3px 6px;
+  border-bottom: 1px solid #f1e7e7;
+}
+.tzs-pp-table .h {
+  white-space: nowrap;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--tzs-grey);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.tzs-pp-table .h.agent {
+  color: var(--tzs-red);
+}
+.tzs-pp-table .m,
+.tzs-pp-table .a {
+  font-size: 40px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.tzs-pp-table .m {
+  color: var(--tzs-grey-2);
+}
+.tzs-pp-table .a {
+  color: var(--tzs-red);
+}
+.tzs-pp-table .eq {
+  text-align: center;
+  color: var(--tzs-grey);
+  font-size: 34px;
+}
+.tzs-pp-table .same {
+  margin-left: 14px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--tzs-grey);
+}
+.tzs-pp-table .tot {
+  border-bottom: 0;
+  border-top: 3px solid var(--tzs-ink);
+  font-weight: 900;
+}
+.tzs-pp-note {
+  font-size: 24px;
+  color: var(--tzs-grey);
+}
+.tzs-final-people .tzs-final-close {
+  font-size: 44px;
+}

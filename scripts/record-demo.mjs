@@ -1,10 +1,10 @@
 // Record the stage at 1920×1080 to a video file, for reviewers who watch instead of opening the page.
 //   node scripts/serve-demo.mjs &   (offline bundle on http://localhost:4173)
 //   node scripts/record-demo.mjs [url] [out.webm] [normal|slow|brief|present]
-//     normal:  scenes + conclusion cards + both final pages (about 100 s)
+//     normal:  scenes + conclusion cards + the final people page (about 93 s)
 //     slow:    the same at ×3 (about 260 s)
-//     brief:   the 30-second version (?brief=1 is added to the url) + final pages (about 50 s)
-//     present: ?pace=slow — scenes ×1.6 and 8-second cards, for a presenter talking over it (about 148 s)
+//     brief:   the 30-second version (?brief=1 is added to the url) + the final page (about 43 s)
+//     present: ?pace=slow — scenes ×1.6 and 8-second cards, for a presenter talking over it (about 141 s)
 // Uses the installed Microsoft Edge through Playwright (no browser download).
 import { chromium } from '@playwright/test'
 import { mkdirSync, renameSync } from 'node:fs'
@@ -18,9 +18,10 @@ const out = resolve(process.argv[3] || 'F:/_tmp/tram-z-demo.webm')
 const dir = resolve(dirname(out), '_rec')
 mkdirSync(dir, { recursive: true })
 
-// day play (45 s) + 7 cards × 5 s = 80 s; final screen 2 pages × 8 s; margin.
+// day play (45 s) + 7 cards × 5 s = 80 s; final screen: one people page held 8 s (+ margin to see the closing line).
 // present: play 45 s × 1.6 = 72 s + 7 cards × 8 s = 128 s.
-const WAIT = { normal: 80_000 + 16_000 + 4_000, slow: 240_000 + 16_000 + 6_000, brief: 30_000 + 16_000 + 4_000, present: 128_000 + 16_000 + 4_000 }
+const FINAL = 8_000 + 3_000
+const WAIT = { normal: 80_000 + FINAL + 2_000, slow: 240_000 + FINAL + 4_000, brief: 30_000 + FINAL + 2_000, present: 128_000 + FINAL + 2_000 }
 
 const browser = await chromium.launch({ channel: 'msedge' })
 const context = await browser.newContext({

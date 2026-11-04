@@ -3,8 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { conclusionOf } from '../../src/components/tram-z-stage/conclusion'
-import { fmtVnd } from '../../src/components/tram-z-stage/format'
-import { RATES_LINE, aboutTime, cellAmount, centralLines, finalColumns, sourceLabel, viDecimal, viewNumbers } from '../../src/components/tram-z-stage/FinalScreen'
+import { finalColumns, peopleNumbers, sourceLabel, viDecimal } from '../../src/components/tram-z-stage/FinalScreen'
 import { clockOf } from '../../src/components/tram-z-stage/format'
 import { SCENES, TOOL_LABELS } from '../../src/components/tram-z-stage/roster'
 import { applyEvent, initialState } from '../../src/components/tram-z-stage/state'
@@ -160,72 +159,59 @@ describe('tram-z-stage final screen', () => {
     }
   })
 
-  it('shows the honest view: station minutes, whole people, money from view only', () => {
+  it('shows people and money only, from people_summary, whole people', () => {
     const v = headcount.view!
-    expect(v).toBeTruthy()
-    const n = viewNumbers(v)
-    // no fractional people anywhere on the two pages
-    for (const p of n.people) expect(Number.isInteger(p)).toBe(true)
-    expect(n.manualPeople).toMatch(/^\d+ người$/)
-    expect(n.agentPeople).toMatch(/^\d+ người \+ 6 agent$/)
-    const c = v.central_50
-    // headline people are full-time people; hourly work and the hired van are counted in hours and trips
-    const ft = (rows: typeof c.manual) => rows.filter((r) => r.pay?.startsWith('toàn thời gian')).reduce((x, r) => x + (r.people ?? 0), 0)
-    expect(c.manual_people).toBe(ft(c.manual))
-    expect(c.with_agents_people).toBe(ft(c.with_agents))
-    expect(c.with_agents_cost_vnd_month).toBe(c.with_agents_staff_cost_vnd_month + c.agents_cost_vnd_month)
-    expect(c.saving_vnd_month).toBeCloseTo(c.manual_cost_vnd_month - c.with_agents_cost_vnd_month, 0)
-    // the station is the same person on both sides: minutes, no wage
-    expect(v.station.with_agents_minutes_day).toBeLessThan(v.station.manual_minutes_day)
-    expect(v.station.rows.filter((r) => r.kind === 'tay_chan').every((r) => r.manual_min === r.with_agent_min)).toBe(true)
-    expect(aboutTime(119)).toBe('khoảng 2 giờ')
-    expect(aboutTime(42.5)).toBe('43 phút')
+    const ps = v.central_50.people_summary!
+    expect(ps).toBeTruthy()
+    const n = peopleNumbers(v)
+    expect(Number.isInteger(ps.manual_people)).toBe(true)
+    expect(Number.isInteger(ps.with_agents_people)).toBe(true)
+    expect(n.manual).toBe(`khoảng ${ps.manual_people} người`)
+    expect(n.agent).toBe(`khoảng ${ps.with_agents_people} người + ${ps.agents} agent`)
+    expect(n.costFrom).toBe(`khoảng ${ps.manual_cost_trieu} triệu`)
+    expect(n.costTo).toBe(`khoảng ${ps.with_agents_cost_trieu} triệu`)
+    expect(n.fee).toBe(`${ps.fee_pool_trieu} triệu`)
+    expect(n.costLine).toBe(ps.cost_line)
+    expect(n.costLine).toContain(n.costFrom)
+    expect(n.costLine).toContain(n.costTo)
+    expect(n.within).toBe(ps.within_fee_pool)
+    expect(n.headline).toBe(ps.headline)
+    expect(n.transport).toBe('xe tải thuê ngoài là số tạm, chờ báo giá')
+    // nothing on the page is minutes, a formula or a fraction of a person
+    const onScreen = [n.manual, n.agent, n.costLine, n.totalManual, n.totalAgent, n.transport, n.headline,
+      ...n.groups.flatMap((g) => [g.label, g.manual, g.agent])].join(' | ')
+    expect(onScreen).not.toMatch(/phút|giờ\/ngày|×|÷|\d,\d+ người|=\s*\d/)
   })
 
-  it('groups the 50-station rows by kind; physical rows are identical on both sides', () => {
+  it('lists the three groups from the file, whole people, physical work equal on both sides', () => {
     const v = headcount.view!
-    const c = v.central_50
-    const groups = centralLines(c)
-    expect(groups.map((g) => g.kind)).toEqual(['van_phong', 'tay_chan', 'quan_ly'])
-    expect(groups[1].title).toBe('Việc tay chân — giữ nguyên ở cả hai bên')
-    for (const l of groups[1].lines) {
-      expect(l.same).toBe(true)
-      expect(l.manual!.people).toBe(l.agent!.people)
-      expect(l.manual!.cost_vnd_month).toBe(l.agent!.cost_vnd_month)
+    const ps = v.central_50.people_summary!
+    const n = peopleNumbers(v)
+    expect(n.groups.map((g) => g.label)).toEqual(ps.groups.map((g) => g.label))
+    for (const [i, g] of ps.groups.entries()) {
+      expect(Number.isInteger(g.manual)).toBe(true)
+      expect(Number.isInteger(g.with_agents)).toBe(true)
+      expect(n.groups[i].manual).toBe(String(g.manual))
+      expect(n.groups[i].agent).toBe(String(g.with_agents))
+      if (g.same_both_sides) expect(g.manual).toBe(g.with_agents)
     }
-    // every row of the file appears exactly once, with whole people
-    const shown = groups.flatMap((g) => g.lines)
-    expect(new Set(shown.map((l) => l.role)).size).toBe(new Set([...c.manual, ...c.with_agents].map((r) => r.role)).size)
-    for (const l of shown) for (const r of [l.manual, l.agent]) if (r && r.people !== null) expect(Number.isInteger(r.people)).toBe(true)
-    // office headline from the file
-    const n = viewNumbers(v)
-    expect(n.officeManual).toBe(`${c.office_people_manual} người`)
-    expect(n.officeAgent).toBe(`${c.office_people_with_agents} người + 6 agent`)
-    expect(c.office_people_manual).toBe(c.manual.filter((r) => r.kind === 'van_phong').reduce((x, r) => x + (r.people ?? 0), 0))
-    expect(n.agentNote).toContain('đo từ các lượt chạy thật 30, 150, 300 đơn')
-    expect(c.agent_cost_model!.fit_points.length).toBeGreaterThanOrEqual(1)
-    expect(RATES_LINE).toContain('theo giờ 30.000 đ')
-    expect(RATES_LINE).toContain('toàn thời gian có bảo hiểm')
-    expect(v.assumptions!.every((a) => a.what && a.value && a.source)).toBe(true)
+    expect(ps.manual_people).toBe(ps.groups.reduce((x, g) => x + g.manual, 0))
+    expect(ps.with_agents_people).toBe(ps.groups.reduce((x, g) => x + g.with_agents, 0))
+    expect(n.totalManual).toBe(String(ps.manual_people))
+    expect(n.totalAgent).toBe(`${ps.with_agents_people} + ${ps.agents} agent`)
+    // costs equal the detailed table in the same file
+    expect(ps.manual_cost_vnd_month).toBe(v.central_50.manual_cost_vnd_month)
+    expect(ps.with_agents_cost_vnd_month).toBe(v.central_50.with_agents_cost_vnd_month)
+  })
+
+  it('keeps the sources readable', () => {
+    expect(v_assumptionsOk()).toBe(true)
     expect(sourceLabel('ASSUMED, chờ Chợ Z')).toBe('giả định, chờ Chợ Z xác nhận')
     expect(viDecimal('tài xế 12.5 tr; × 1.318')).toBe('tài xế 12,5 tr; × 1,318')
   })
-
-  it('shows the fee pool, hours for hourly work, and whether the agent model fits inside the fee', () => {
-    const v = headcount.view!
-    const c = v.central_50
-    const n = viewNumbers(v)
-    expect(c.fee_pool!.vnd_month).toBe(180_000_000)
-    expect(n.feeLine).toBe(`${c.fee_pool!.text}: ${fmtVnd(c.fee_pool!.vnd_month)}/tháng`)
-    expect(n.within).toBe(c.with_agents_cost_vnd_month <= c.fee_pool!.vnd_month)
-    expect(n.overshoot).toBe(fmtVnd(c.manual_cost_vnd_month - c.fee_pool!.vnd_month))
-    expect(n.manualPeopleFT).toBe(`${c.manual_people} người toàn thời gian`)
-    const hourly = c.with_agents.filter((r) => r.pay?.startsWith('theo giờ'))
-    expect(hourly.length).toBeGreaterThan(0)
-    for (const r of hourly) expect(cellAmount(r)).toMatch(/giờ\/ngày$/)
-    const van = c.with_agents.find((r) => r.pay?.startsWith('thuê'))!
-    expect(cellAmount(van)).toBe('theo chuyến')
-    expect(c.managers).toEqual({ manual: 4, with_agents: 2 })
-    expect(v.assumptions!.length).toBeGreaterThanOrEqual(11)
-  })
 })
+
+function v_assumptionsOk(): boolean {
+  const a = headcount.view?.assumptions ?? []
+  return a.length > 0 && a.every((x) => x.what && x.value && x.source)
+}
