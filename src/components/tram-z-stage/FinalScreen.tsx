@@ -1,7 +1,7 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { type ReactNode, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { fmtDec, fmtInt, fmtPct, fmtVnd } from './format'
 import { AGENTS } from './roster'
@@ -207,8 +207,6 @@ export function aboutTime(minutes: number): string {
   return `${h} giờ ${r} phút`
 }
 
-const ROLE_SHORT: Record<string, string> = { 'điều phối': 'điều phối', 'nhân viên nội dung': 'đăng bán', 'kế toán': 'kế toán' }
-
 /** Every number of the two pages, from headcount.json `view` only (a test checks there are no fractional people). */
 export function viewNumbers(v: HeadcountView) {
   const st = v.station
@@ -223,7 +221,10 @@ export function viewNumbers(v: HeadcountView) {
     manualCost: fmtVnd(c.manual_cost_vnd_month),
     agentCost: fmtVnd(c.with_agents_cost_vnd_month),
     saving: fmtVnd(c.saving_vnd_month),
-    perOrder: fmtVnd(v.agent_cost_vnd_per_order),
+    perOrder: fmtVnd(c.agent_cost_model?.cost_vnd_per_order_1500 ?? v.agent_cost_vnd_per_order),
+    officeManual: `${fmtInt(c.office_people_manual ?? 0)} người`,
+    officeAgent: `${fmtInt(c.office_people_with_agents ?? 0)} người + ${fmtInt(c.agents)} agent`,
+    agentNote: `≈ ${fmtVnd(c.agent_cost_model?.cost_vnd_per_order_1500 ?? v.agent_cost_vnd_per_order)}/đơn, đo từ các lượt chạy thật 30, 150, 300 đơn`,
     people: [...c.manual, ...c.with_agents].map((r) => r.people),
   }
 }
@@ -292,85 +293,159 @@ function StationPage({ v }: { v: HeadcountView }) {
   )
 }
 
-function TeamColumn({
-  title,
-  rows,
-  side,
-  total,
-  people,
-  extra,
-}: {
-  title: string
-  rows: HeadcountView['central_50']['manual']
-  side: 'manual' | 'agents'
-  total: string
-  people: string
-  extra?: ReactNode
-}) {
+type TeamRow = HeadcountView['central_50']['manual'][number]
+
+const KIND_TITLE: Record<string, string> = {
+  van_phong: 'Việc giấy tờ, tính toán',
+  tay_chan: 'Việc tay chân — giữ nguyên ở cả hai bên',
+  quan_ly: 'Quản lý',
+}
+const KIND_ORDER = ['van_phong', 'tay_chan', 'quan_ly']
+
+export interface CentralLine {
+  role: string
+  kind: string
+  manual: TeamRow | null
+  agent: TeamRow | null
+  same: boolean
+}
+
+/** One line per role, grouped by kind, manual and with-agent side by side (rows only from headcount.json). */
+export function centralLines(c: HeadcountView['central_50']): { kind: string; title: string; lines: CentralLine[] }[] {
+  const roles: string[] = []
+  for (const r of [...c.manual, ...c.with_agents]) if (!roles.includes(r.role)) roles.push(r.role)
+  const kindOf = (role: string) =>
+    (c.manual.find((r) => r.role === role)?.kind ?? c.with_agents.find((r) => r.role === role)?.kind ?? 'van_phong') as string
+  return KIND_ORDER.map((kind) => {
+    const lines = roles
+      .filter((role) => kindOf(role) === kind)
+      .map((role) => {
+        const manual = c.manual.find((r) => r.role === role) ?? null
+        const agent = c.with_agents.find((r) => r.role === role) ?? null
+        return { role, kind, manual, agent, same: kind === 'tay_chan' && !!manual && !!agent && manual.people === agent.people }
+      })
+    return { kind, title: KIND_TITLE[kind] ?? kind, lines }
+  }).filter((g) => g.lines.length > 0)
+}
+
+function Cell({ r }: { r: TeamRow | null }) {
+  if (!r) return <><span className="n dim">—</span><span className="vnd dim">agent làm</span></>
   return (
-    <div className={`tzs-v-col ${side}`}>
-      <div className="title">{title}</div>
-      {rows.map((r) => (
-        <div key={r.role} className="row">
-          <span className="role">
-            {r.role}
-            {r.detail && (
-              <em>
-                {Object.entries(r.detail)
-                  .map(([k, x]) => `${ROLE_SHORT[k] ?? k} ${dec1.format(x)}`)
-                  .join(' · ')}{' '}
-                ngày công mỗi ngày
-              </em>
-            )}
-          </span>
-          <span className="n">{fmtInt(r.people)} người</span>
-          <span className="vnd">{fmtVnd(r.cost_vnd_month)}</span>
-        </div>
-      ))}
-      {extra}
-      <div className="total">
-        <span>{people}</span>
-        <b>{total}/tháng</b>
-      </div>
-    </div>
+    <>
+      <span className="n">{fmtInt(r.people)}</span>
+      <span className="vnd">{fmtVnd(r.cost_vnd_month)}</span>
+    </>
   )
 }
 
 function CentralPage({ v }: { v: HeadcountView }) {
   const c = v.central_50
   const n = viewNumbers(v)
+  const groups = centralLines(c)
   return (
-    <motion.div className="tzs-v-page" data-page="central" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
+    <motion.div className="tzs-v-page tzs-c50" data-page="central" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
       <div className="tzs-v-sub">
-        <b>Bộ máy trung tâm (văn phòng + kho) cho 50 trạm</b>, 1.500 đơn/ngày · tính bằng người nguyên
+        <b>Bộ máy trung tâm (văn phòng + kho) cho 50 trạm</b>, 1.500 đơn/ngày · người nguyên, lương thật
       </div>
-      <div className="tzs-v-cols">
-        <TeamColumn title="Chỉ con người" side="manual" rows={c.manual} people={n.manualPeople} total={n.manualCost} />
-        <div className="vs">so với</div>
-        <TeamColumn
-          title={`Con người + ${fmtInt(c.agents)} agent`}
-          side="agents"
-          rows={c.with_agents}
-          people={n.agentPeople}
-          total={n.agentCost}
-          extra={
-            <div className="agents">
-              <div className="names">{AGENTS.map((a) => a.name).join(' · ')}</div>
-              <div className="row">
-                <span className="role">{fmtInt(c.agents)} agent (Claude, Meta)</span>
-                <span className="n">≈ {n.perOrder}/đơn</span>
-                <span className="vnd">{fmtVnd(c.agents_cost_vnd_month)}</span>
-              </div>
-            </div>
-          }
-        />
+      <div className="tzs-c50-hero">
+        <div className="cmp">
+          <span className="m">{n.manualPeople} · {n.manualCost}/tháng</span>
+          <span className="arr">→</span>
+          <span className="a">{n.agentPeople} · {n.agentCost}/tháng</span>
+        </div>
+        <div className="line2">
+          <div className="office">
+            Việc giấy tờ: <b>{n.officeManual}</b> → <b>{n.officeAgent}</b>
+          </div>
+          <motion.div className="saving" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.5 }}>
+            <b>{n.saving}</b> mỗi tháng ít hơn
+          </motion.div>
+        </div>
       </div>
-      <motion.div className="tzs-v-diff" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.5 }}>
-        <span className="val">{n.saving}</span>
-        <span className="lbl">mỗi tháng ít hơn khi có đội agent</span>
-      </motion.div>
-      <div className="tzs-v-small">
-        {ucFirst(c.rounding)}. Không gồm: {v.excluded.join('; ')}.
+      <div className="tzs-c50-grid">
+        <div className="tzs-c50-row head">
+          <span className="role" />
+          <span className="hcol manual">Chỉ con người</span>
+          <span className="hcol agent">Con người + {fmtInt(c.agents)} agent</span>
+        </div>
+        {groups.map((g, gi) => (
+          <div key={g.kind} className={`tzs-c50-group ${g.kind}`}>
+            <div className="gtitle">{g.title}</div>
+            {g.lines.map((l, i) => (
+              <motion.div key={l.role} className={`tzs-c50-row ${l.same ? 'same' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 + gi * 0.3 + i * 0.07 }}>
+                <span className="role">{ucFirst(l.role)}</span>
+                <span className="side manual"><Cell r={l.manual} /></span>
+                <span className="eq">{l.same ? '=' : ''}</span>
+                <span className="side agent"><Cell r={l.agent} /></span>
+              </motion.div>
+            ))}
+          </div>
+        ))}
+        <div className="tzs-c50-row agents">
+          <span className="role">
+            {fmtInt(c.agents)} agent: {AGENTS.map((a) => a.name).join(' · ')}
+          </span>
+          <span className="side manual"><span className="n dim">—</span><span className="vnd dim" /></span>
+          <span className="eq" />
+          <span className="side agent">
+            <span className="n">{fmtInt(c.agents)}</span>
+            <span className="vnd">{fmtVnd(c.agents_cost_vnd_month)}</span>
+          </span>
+        </div>
+        <div className="tzs-c50-row total">
+          <span className="role">Tổng mỗi tháng</span>
+          <span className="side manual"><span className="n">{fmtInt(c.manual_people)}</span><span className="vnd">{n.manualCost}</span></span>
+          <span className="eq" />
+          <span className="side agent"><span className="n">{fmtInt(c.with_agents_people)}</span><span className="vnd">{n.agentCost}</span></span>
+        </div>
+      </div>
+      <div className="tzs-c50-small">
+        <div>
+          Agent {n.agentNote}. {RATES_LINE}.
+        </div>
+        <div>
+          {ucFirst(c.rounding)}. Không gồm: {v.excluded.join('; ')}.
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+export const RATES_LINE =
+  'Lương: tin tuyển dụng Hải Phòng 2026 + 23,5 % bảo hiểm và công đoàn + lương tháng 13; soạn hàng 100 món/giờ; khách hỏi 10/100 đơn; 20 trạm/tuyến xe'
+
+/** "12.5 tr", "1.20", "× 1.318" (Python decimals) → Vietnamese decimal comma. */
+/** "ASSUMED" / "ASSUMED, chờ Chợ Z" (sim/staffing.py) → plain words for the jury. */
+export const sourceLabel = (t: string) =>
+  t.startsWith('ASSUMED') ? 'giả định, chờ Chợ Z xác nhận' : t
+
+export const viDecimal = (t: string) => t.replace(/(\d)\.(\d)/g, '$1,$2')
+
+function SourcesPage({ v }: { v: HeadcountView }) {
+  const rows = v.assumptions ?? []
+  const m = v.central_50.agent_cost_model
+  return (
+    <motion.div className="tzs-v-page tzs-src" data-page="sources" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
+      <div className="tzs-v-sub">
+        <b>Nguồn số liệu</b> · mỗi con số trên trang trước lấy từ đây; đổi một dòng, cả hai cột đổi theo
+      </div>
+      <div className="tzs-src-list">
+        {rows.map((a) => (
+          <div key={a.what} className="tzs-src-row">
+            <span className="what">{a.what}</span>
+            <span className="value">{viDecimal(a.value)}</span>
+            <span className="source">{sourceLabel(a.source)}</span>
+          </div>
+        ))}
+        {m && (
+          <div className="tzs-src-row">
+            <span className="what">Chi phí agent ở 50 trạm</span>
+            <span className="value">≈ {fmtVnd(m.cost_vnd_per_order_1500)}/đơn</span>
+            <span className="source">
+              {m.method}: {m.fit_points.map((p) => `${fmtInt(p.orders)} đơn ${fmtVnd(p.cost_vnd_day)}/ngày`).join(' · ')}
+            </span>
+          </div>
+        )}
       </div>
     </motion.div>
   )
@@ -393,7 +468,7 @@ export function FinalScreen({
   immediate?: boolean
   mode: string | null
 }) {
-  const [page, setPage] = useState<0 | 1>(0)
+  const [page, setPage] = useState<0 | 1 | 2>(0)
   const [closable, setClosable] = useState(!!immediate)
   useEffect(() => {
     if (immediate) return
@@ -408,8 +483,10 @@ export function FinalScreen({
   const view = headcount?.view
   const t1 = headcount?.tram_1
   const t50 = headcount?.tram_50
+  const hasSources = !!view?.assumptions?.length
   const onClick = () => {
     if (page === 0) setPage(1)
+    else if (page === 1 && hasSources) setPage(2)
     else if (closable) onClose()
   }
   return (
@@ -439,10 +516,17 @@ export function FinalScreen({
           <button type="button" className={page === 1 ? 'on' : ''} onClick={() => setPage(1)}>
             50 trạm
           </button>
+          {hasSources && (
+            <button type="button" className={page === 2 ? 'on' : ''} onClick={() => setPage(2)}>
+              Nguồn
+            </button>
+          )}
         </div>
       </div>
       {view ? (
-        <AnimatePresence mode="wait">{page === 0 ? <StationPage key="v1" v={view} /> : <CentralPage key="v50" v={view} />}</AnimatePresence>
+        <AnimatePresence mode="wait">
+          {page === 0 ? <StationPage key="v1" v={view} /> : page === 1 ? <CentralPage key="v50" v={view} /> : <SourcesPage key="src" v={view} />}
+        </AnimatePresence>
       ) : t1 && t50 ? (
         <AnimatePresence mode="wait">
           {page === 0 ? <Page key="p1" block={t1} label="1 trạm" /> : <Page key="p50" block={t50} label="50 trạm" />}
@@ -458,7 +542,9 @@ export function FinalScreen({
       </div>
       {mode === 'mock' && <div className="tzs-final-mode mock">DỮ LIỆU MẪU</div>}
       {mode === 'live' && <div className="tzs-final-mode live">Chạy thật · Claude + Meta</div>}
-      <div className="tzs-final-hint">{closable ? 'Bấm để đóng' : page === 0 ? (view ? 'Bấm để xem bộ máy 50 trạm' : 'Bấm để xem 50 trạm') : ''}</div>
+      <div className="tzs-final-hint">
+        {page === 0 ? (view ? 'Bấm để xem bộ máy 50 trạm' : 'Bấm để xem 50 trạm') : page === 1 && hasSources ? 'Bấm để xem nguồn số liệu' : closable ? 'Bấm để đóng' : ''}
+      </div>
     </motion.div>
   )
 }

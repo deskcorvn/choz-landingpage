@@ -109,8 +109,28 @@ export interface ViewTeamRow {
   role: string
   people: number
   cost_vnd_month: number
+  /** tay_chan: same on both sides · van_phong: agents do it, a person approves · quan_ly: team leads */
+  kind?: 'tay_chan' | 'van_phong' | 'quan_ly' | string
+  how?: string
   detail?: Record<string, number>
-  minutes_day?: number
+  minutes_day?: number | null
+}
+
+export interface AgentCostModel {
+  fit_points: { orders: number; cost_vnd_day: number; run: string }[]
+  fixed_vnd_day?: number
+  per_order_vnd?: number
+  parts_vnd_day?: Record<string, number>
+  cost_vnd_day_1500?: number
+  cost_vnd_month_1500?: number
+  cost_vnd_per_order_1500: number
+  method: string
+}
+
+export interface ViewAssumption {
+  what: string
+  value: string
+  source: string
 }
 
 export interface HeadcountView {
@@ -143,8 +163,13 @@ export interface HeadcountView {
     with_agents_cost_vnd_month: number
     saving_vnd_month: number
     rounding: string
-    min_office_with_agents: number
+    min_office_with_agents?: number
+    office_people_manual?: number
+    office_people_with_agents?: number
+    physical_people?: number
+    agent_cost_model?: AgentCostModel
   }
+  assumptions?: ViewAssumption[]
   agent_cost_vnd_per_order: number
   excluded: string[]
 }

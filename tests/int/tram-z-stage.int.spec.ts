@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { conclusionOf } from '../../src/components/tram-z-stage/conclusion'
-import { aboutTime, finalColumns, viewNumbers } from '../../src/components/tram-z-stage/FinalScreen'
+import { RATES_LINE, aboutTime, centralLines, finalColumns, sourceLabel, viDecimal, viewNumbers } from '../../src/components/tram-z-stage/FinalScreen'
 import { clockOf } from '../../src/components/tram-z-stage/format'
 import { SCENES, TOOL_LABELS } from '../../src/components/tram-z-stage/roster'
 import { applyEvent, initialState } from '../../src/components/tram-z-stage/state'
@@ -177,5 +177,33 @@ describe('tram-z-stage final screen', () => {
     expect(v.station.rows.filter((r) => r.kind === 'tay_chan').every((r) => r.manual_min === r.with_agent_min)).toBe(true)
     expect(aboutTime(119)).toBe('khoảng 2 giờ')
     expect(aboutTime(42.5)).toBe('43 phút')
+  })
+
+  it('groups the 50-station rows by kind; physical rows are identical on both sides', () => {
+    const v = headcount.view!
+    const c = v.central_50
+    const groups = centralLines(c)
+    expect(groups.map((g) => g.kind)).toEqual(['van_phong', 'tay_chan', 'quan_ly'])
+    expect(groups[1].title).toBe('Việc tay chân — giữ nguyên ở cả hai bên')
+    for (const l of groups[1].lines) {
+      expect(l.same).toBe(true)
+      expect(l.manual!.people).toBe(l.agent!.people)
+      expect(l.manual!.cost_vnd_month).toBe(l.agent!.cost_vnd_month)
+    }
+    // every row of the file appears exactly once, with whole people
+    const shown = groups.flatMap((g) => g.lines)
+    expect(new Set(shown.map((l) => l.role)).size).toBe(new Set([...c.manual, ...c.with_agents].map((r) => r.role)).size)
+    for (const l of shown) for (const r of [l.manual, l.agent]) if (r) expect(Number.isInteger(r.people)).toBe(true)
+    // office headline from the file
+    const n = viewNumbers(v)
+    expect(n.officeManual).toBe(`${c.office_people_manual} người`)
+    expect(n.officeAgent).toBe(`${c.office_people_with_agents} người + 6 agent`)
+    expect(c.office_people_manual).toBe(c.manual.filter((r) => r.kind === 'van_phong').reduce((x, r) => x + r.people, 0))
+    expect(n.agentNote).toContain('đo từ các lượt chạy thật 30, 150, 300 đơn')
+    expect(c.agent_cost_model!.fit_points.length).toBeGreaterThanOrEqual(1)
+    expect(RATES_LINE).toContain('23,5 %')
+    expect(v.assumptions!.every((a) => a.what && a.value && a.source)).toBe(true)
+    expect(sourceLabel('ASSUMED, chờ Chợ Z')).toBe('giả định, chờ Chợ Z xác nhận')
+    expect(viDecimal('tài xế 12.5 tr; × 1.318')).toBe('tài xế 12,5 tr; × 1,318')
   })
 })
