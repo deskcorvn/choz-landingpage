@@ -3,7 +3,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { conclusionOf } from '../../src/components/tram-z-stage/conclusion'
-import { finalColumns } from '../../src/components/tram-z-stage/FinalScreen'
+import { aboutTime, finalColumns, viewNumbers } from '../../src/components/tram-z-stage/FinalScreen'
 import { clockOf } from '../../src/components/tram-z-stage/format'
 import { SCENES, TOOL_LABELS } from '../../src/components/tram-z-stage/roster'
 import { applyEvent, initialState } from '../../src/components/tram-z-stage/state'
@@ -157,5 +157,25 @@ describe('tram-z-stage final screen', () => {
       expect(b.office!.with_agents_people + b.physical!.people).toBeCloseTo(b.with_agents_people, 1)
       expect(b.office!.with_agents_minutes).toBeLessThan(b.office!.manual_minutes)
     }
+  })
+
+  it('shows the honest view: station minutes, whole people, money from view only', () => {
+    const v = headcount.view!
+    expect(v).toBeTruthy()
+    const n = viewNumbers(v)
+    // no fractional people anywhere on the two pages
+    for (const p of n.people) expect(Number.isInteger(p)).toBe(true)
+    expect(n.manualPeople).toMatch(/^\d+ người$/)
+    expect(n.agentPeople).toMatch(/^\d+ người \+ 6 agent$/)
+    const c = v.central_50
+    expect(c.manual_people).toBe(c.manual.reduce((x, r) => x + r.people, 0))
+    expect(c.with_agents_people).toBe(c.with_agents.reduce((x, r) => x + r.people, 0))
+    expect(c.with_agents_cost_vnd_month).toBe(c.with_agents_staff_cost_vnd_month + c.agents_cost_vnd_month)
+    expect(c.saving_vnd_month).toBeCloseTo(c.manual_cost_vnd_month - c.with_agents_cost_vnd_month, 0)
+    // the station is the same person on both sides: minutes, no wage
+    expect(v.station.with_agents_minutes_day).toBeLessThan(v.station.manual_minutes_day)
+    expect(v.station.rows.filter((r) => r.kind === 'tay_chan').every((r) => r.manual_min === r.with_agent_min)).toBe(true)
+    expect(aboutTime(119)).toBe('khoảng 2 giờ')
+    expect(aboutTime(42.5)).toBe('43 phút')
   })
 })

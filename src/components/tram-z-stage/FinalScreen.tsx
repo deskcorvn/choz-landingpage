@@ -1,11 +1,11 @@
 'use client'
 
 import { AnimatePresence, motion } from 'framer-motion'
-import { useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
 import { fmtDec, fmtInt, fmtPct, fmtVnd } from './format'
 import { AGENTS } from './roster'
-import type { Headcount, HeadcountBlock, RoleRow } from './types'
+import type { Headcount, HeadcountBlock, HeadcountView, RoleRow } from './types'
 
 export const FINAL_PAGE_MS = 8000
 export const FOOTNOTE = 'định mức thủ công và lương là giả định, số có agent đo từ ngày mô phỏng'
@@ -194,6 +194,188 @@ function Page({ block, label }: { block: HeadcountBlock; label: string }) {
   )
 }
 
+const dec1 = new Intl.NumberFormat('vi-VN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })
+
+/** "119 phút" → "khoảng 2 giờ"; "42,5" → "43 phút": what a listener can picture. */
+export function aboutTime(minutes: number): string {
+  const m = Math.round(minutes)
+  if (m < 60) return `${m} phút`
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  if (r <= 5) return `khoảng ${h} giờ`
+  if (r >= 55) return `khoảng ${h + 1} giờ`
+  return `${h} giờ ${r} phút`
+}
+
+const ROLE_SHORT: Record<string, string> = { 'điều phối': 'điều phối', 'nhân viên nội dung': 'đăng bán', 'kế toán': 'kế toán' }
+
+/** Every number of the two pages, from headcount.json `view` only (a test checks there are no fractional people). */
+export function viewNumbers(v: HeadcountView) {
+  const st = v.station
+  const c = v.central_50
+  return {
+    stationManual: `${fmtInt(st.manual_minutes_day)} phút/ngày`,
+    stationAgent: `${fmtInt(st.with_agents_minutes_day)} phút/ngày`,
+    stationAbout: `${aboutTime(st.manual_minutes_day)} → ${aboutTime(st.with_agents_minutes_day)}`,
+    share: `Trạm nhận ${fmtInt(st.share_pct)} % phí: ${fmtVnd(st.share_vnd_day)}/ngày ≈ ${fmtVnd(st.share_vnd_month)}/tháng`,
+    manualPeople: `${fmtInt(c.manual_people)} người`,
+    agentPeople: `${fmtInt(c.with_agents_people)} người + ${fmtInt(c.agents)} agent`,
+    manualCost: fmtVnd(c.manual_cost_vnd_month),
+    agentCost: fmtVnd(c.with_agents_cost_vnd_month),
+    saving: fmtVnd(c.saving_vnd_month),
+    perOrder: fmtVnd(v.agent_cost_vnd_per_order),
+    people: [...c.manual, ...c.with_agents].map((r) => r.people),
+  }
+}
+
+function StationPage({ v }: { v: HeadcountView }) {
+  const st = v.station
+  const c1 = v.central_1
+  const n = viewNumbers(v)
+  return (
+    <motion.div className="tzs-v-page" data-page="station" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
+      <div className="tzs-v-sub">
+        <b>Tại mỗi Trạm Z</b> · người trực trạm: chủ tiệm hoặc bạn trẻ, cùng một người ở cả hai cách
+      </div>
+      <div className="tzs-v-hero">
+        <div className="side manual">
+          <div className="k">Chỉ con người</div>
+          <div className="big">{n.stationManual}</div>
+        </div>
+        <div className="arr">→</div>
+        <div className="side agents">
+          <div className="k">Con người + agent</div>
+          <div className="big">{n.stationAgent}</div>
+        </div>
+        <div className="about">
+          {n.stationAbout}
+          <span>việc Chợ Z mỗi ngày của người trực trạm</span>
+        </div>
+      </div>
+      <div className="tzs-v-grid">
+        <div className="tzs-v-table">
+          <div className="h">
+            <span>Việc ở trạm</span>
+            <span>Làm tay</span>
+            <span>Có agent</span>
+          </div>
+          {st.rows.map((r, i) => (
+            <motion.div key={r.task} className={`r ${r.kind === 'tay_chan' ? 'phys' : ''}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 + i * 0.1 }}>
+              <span className="task">
+                {r.task}
+                {r.kind === 'tay_chan' && <em>tay chân, giữ nguyên</em>}
+              </span>
+              <span className="m">{r.manual_min ? `${dec1.format(r.manual_min)} phút` : '—'}</span>
+              <span className="a">{r.with_agent_min ? `${dec1.format(r.with_agent_min)} phút` : '0'}</span>
+            </motion.div>
+          ))}
+        </div>
+        <div className="tzs-v-side">
+          <div className="box money">
+            <div className="t">{n.share}</div>
+            <div className="s">Không tính lương ở cả hai bên: người trực trạm được trả bằng phần phí này.</div>
+          </div>
+          <div className="box pilot">
+            <div className="k">Một trạm thử nghiệm: văn phòng và kho</div>
+            <div className="t">
+              Giấy tờ văn phòng: {fmtInt(c1.office_minutes_day_manual)} phút/ngày làm tay → agent làm, chủ kho duyệt {fmtInt(c1.approval_minutes_day_with_agents)} phút/ngày
+            </div>
+            <div className="t">Chia hàng ở kho: {fmtInt(c1.kho_minutes_day)} phút/ngày, giữ nguyên</div>
+            <div className="s">Một trạm chưa đủ việc cho bộ máy riêng nên tính bằng phút.</div>
+          </div>
+        </div>
+      </div>
+      <motion.div className="tzs-v-msg" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.6, duration: 0.5 }}>
+        Agent không thay người trực trạm; agent bớt giấy tờ cho người đó.
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function TeamColumn({
+  title,
+  rows,
+  side,
+  total,
+  people,
+  extra,
+}: {
+  title: string
+  rows: HeadcountView['central_50']['manual']
+  side: 'manual' | 'agents'
+  total: string
+  people: string
+  extra?: ReactNode
+}) {
+  return (
+    <div className={`tzs-v-col ${side}`}>
+      <div className="title">{title}</div>
+      {rows.map((r) => (
+        <div key={r.role} className="row">
+          <span className="role">
+            {r.role}
+            {r.detail && (
+              <em>
+                {Object.entries(r.detail)
+                  .map(([k, x]) => `${ROLE_SHORT[k] ?? k} ${dec1.format(x)}`)
+                  .join(' · ')}{' '}
+                ngày công mỗi ngày
+              </em>
+            )}
+          </span>
+          <span className="n">{fmtInt(r.people)} người</span>
+          <span className="vnd">{fmtVnd(r.cost_vnd_month)}</span>
+        </div>
+      ))}
+      {extra}
+      <div className="total">
+        <span>{people}</span>
+        <b>{total}/tháng</b>
+      </div>
+    </div>
+  )
+}
+
+function CentralPage({ v }: { v: HeadcountView }) {
+  const c = v.central_50
+  const n = viewNumbers(v)
+  return (
+    <motion.div className="tzs-v-page" data-page="central" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
+      <div className="tzs-v-sub">
+        <b>Bộ máy trung tâm (văn phòng + kho) cho 50 trạm</b>, 1.500 đơn/ngày · tính bằng người nguyên
+      </div>
+      <div className="tzs-v-cols">
+        <TeamColumn title="Chỉ con người" side="manual" rows={c.manual} people={n.manualPeople} total={n.manualCost} />
+        <div className="vs">so với</div>
+        <TeamColumn
+          title={`Con người + ${fmtInt(c.agents)} agent`}
+          side="agents"
+          rows={c.with_agents}
+          people={n.agentPeople}
+          total={n.agentCost}
+          extra={
+            <div className="agents">
+              <div className="names">{AGENTS.map((a) => a.name).join(' · ')}</div>
+              <div className="row">
+                <span className="role">{fmtInt(c.agents)} agent (Claude, Meta)</span>
+                <span className="n">≈ {n.perOrder}/đơn</span>
+                <span className="vnd">{fmtVnd(c.agents_cost_vnd_month)}</span>
+              </div>
+            </div>
+          }
+        />
+      </div>
+      <motion.div className="tzs-v-diff" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.5 }}>
+        <span className="val">{n.saving}</span>
+        <span className="lbl">mỗi tháng ít hơn khi có đội agent</span>
+      </motion.div>
+      <div className="tzs-v-small">
+        {ucFirst(c.rounding)}. Không gồm: {v.excluded.join('; ')}.
+      </div>
+    </motion.div>
+  )
+}
+
 /**
  * Final screen: the same work done by people only vs people plus the agent team, for 1 station then 50.
  * Each page holds FINAL_PAGE_MS; after the second it waits for a click. Numbers only from headcount.json.
@@ -223,6 +405,7 @@ export function FinalScreen({
     }
   }, [immediate])
 
+  const view = headcount?.view
   const t1 = headcount?.tram_1
   const t50 = headcount?.tram_50
   const onClick = () => {
@@ -243,18 +426,24 @@ export function FinalScreen({
         <img src={logoSrc} alt="" />
         <div>
           <h2>Cùng khối việc: chỉ con người, hay con người cộng đội agent</h2>
-          <div className="sub">Bao nhiêu người, bao nhiêu agent, hết bao nhiêu tiền mỗi tháng</div>
+          <div className="sub">
+            {view
+              ? 'Mỗi trạm tính bằng phút của người đang trực; bộ máy 50 trạm tính bằng người nguyên và tiền mỗi tháng'
+              : 'Bao nhiêu người, bao nhiêu agent, hết bao nhiêu tiền mỗi tháng'}
+          </div>
         </div>
         <div className="tzs-final-tabs" onClick={(e) => e.stopPropagation()}>
           <button type="button" className={page === 0 ? 'on' : ''} onClick={() => setPage(0)}>
-            1 trạm
+            {view ? 'Mỗi trạm' : '1 trạm'}
           </button>
           <button type="button" className={page === 1 ? 'on' : ''} onClick={() => setPage(1)}>
             50 trạm
           </button>
         </div>
       </div>
-      {t1 && t50 ? (
+      {view ? (
+        <AnimatePresence mode="wait">{page === 0 ? <StationPage key="v1" v={view} /> : <CentralPage key="v50" v={view} />}</AnimatePresence>
+      ) : t1 && t50 ? (
         <AnimatePresence mode="wait">
           {page === 0 ? <Page key="p1" block={t1} label="1 trạm" /> : <Page key="p50" block={t50} label="50 trạm" />}
         </AnimatePresence>
@@ -269,7 +458,7 @@ export function FinalScreen({
       </div>
       {mode === 'mock' && <div className="tzs-final-mode mock">DỮ LIỆU MẪU</div>}
       {mode === 'live' && <div className="tzs-final-mode live">Chạy thật · Claude + Meta</div>}
-      <div className="tzs-final-hint">{closable ? 'Bấm để đóng' : page === 0 ? 'Bấm để xem 50 trạm' : ''}</div>
+      <div className="tzs-final-hint">{closable ? 'Bấm để đóng' : page === 0 ? (view ? 'Bấm để xem bộ máy 50 trạm' : 'Bấm để xem 50 trạm') : ''}</div>
     </motion.div>
   )
 }

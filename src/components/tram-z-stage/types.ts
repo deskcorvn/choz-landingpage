@@ -97,8 +97,61 @@ export interface HeadcountBlock {
   [key: string]: unknown
 }
 
+/** headcount.json `view`: the final screen's numbers in units people can picture (sim/workload.py honest_view). */
+export interface ViewStationRow {
+  task: string
+  manual_min: number
+  with_agent_min: number
+  kind: 'van_phong' | 'tay_chan' | string
+}
+
+export interface ViewTeamRow {
+  role: string
+  people: number
+  cost_vnd_month: number
+  detail?: Record<string, number>
+  minutes_day?: number
+}
+
+export interface HeadcountView {
+  station: {
+    who: string
+    rows: ViewStationRow[]
+    manual_minutes_day: number
+    with_agents_minutes_day: number
+    share_pct: number
+    share_vnd_day: number
+    share_vnd_month: number
+    note: string
+  }
+  central_1: {
+    office_minutes_day_manual: number
+    office_minutes_day_with_agents: number
+    kho_minutes_day: number
+    approval_minutes_day_with_agents: number
+    note: string
+  }
+  central_50: {
+    manual: ViewTeamRow[]
+    with_agents: ViewTeamRow[]
+    manual_people: number
+    with_agents_people: number
+    manual_cost_vnd_month: number
+    with_agents_staff_cost_vnd_month: number
+    agents: number
+    agents_cost_vnd_month: number
+    with_agents_cost_vnd_month: number
+    saving_vnd_month: number
+    rounding: string
+    min_office_with_agents: number
+  }
+  agent_cost_vnd_per_order: number
+  excluded: string[]
+}
+
 export interface Headcount {
   mode?: string
+  view?: HeadcountView
   tram_1: HeadcountBlock
   tram_50: HeadcountBlock
   note?: string
