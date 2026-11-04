@@ -107,8 +107,12 @@ export interface ViewStationRow {
 
 export interface ViewTeamRow {
   role: string
-  people: number
+  /** whole people; null for hourly work counted in hours or a van hired per trip */
+  people: number | null
   cost_vnd_month: number
+  /** "toàn thời gian, có bảo hiểm" | "theo giờ 30.000 đ" | "thuê theo chuyến" */
+  pay?: string
+  hours_day?: number | null
   /** tay_chan: same on both sides · van_phong: agents do it, a person approves · quan_ly: team leads */
   kind?: 'tay_chan' | 'van_phong' | 'quan_ly' | string
   how?: string
@@ -168,6 +172,13 @@ export interface HeadcountView {
     office_people_with_agents?: number
     physical_people?: number
     agent_cost_model?: AgentCostModel
+    operating_days?: number
+    managers?: { manual: number; with_agents: number }
+    people_note?: string
+    same_flow_note?: string
+    /** what the fee leaves for the central team: 4 % of the plan's monthly sales */
+    fee_pool?: { gmv_vnd_month: number; pct: number; vnd_month: number; text: string; source: string }
+    within_fee_pool?: boolean
   }
   assumptions?: ViewAssumption[]
   agent_cost_vnd_per_order: number

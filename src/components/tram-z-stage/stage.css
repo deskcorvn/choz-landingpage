@@ -3196,3 +3196,156 @@
 .tzs-src-row .source {
   color: var(--tzs-grey-2);
 }
+
+/* ── final page 2 v3: office first, fee bar, pay tags, hours, one rates line ───────────────────────── */
+.tzs-c50-hero .office {
+  font-size: 40px;
+  padding: 2px 18px;
+}
+
+.tzs-c50-hero .cmp {
+  font-size: 32px;
+}
+
+.tzs-c50-hero .fee {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 14px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--tzs-text);
+  background: #f6f4ef;
+  border: 1px solid var(--tzs-line);
+  border-radius: 10px;
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+
+.tzs-c50-hero .fee .t {
+  font-weight: 800;
+}
+
+.tzs-c50-hero .fee .chip {
+  font-size: 21px;
+  border-radius: 999px;
+  padding: 2px 12px;
+}
+
+.tzs-c50-hero .fee .chip.over {
+  color: var(--tzs-grey-2);
+  background: #ececec;
+}
+
+.tzs-c50-hero .fee .chip.ok {
+  color: #fff;
+  background: #15803d;
+}
+
+.tzs-c50-hero .fee .saving {
+  margin-left: auto;
+  font-size: 22px;
+  padding: 2px 14px;
+}
+
+.tzs-c50-hero .fee .saving b {
+  font-size: 28px;
+}
+
+.tzs-c50-row {
+  grid-template-columns: 1fr 420px 32px 420px;
+  font-size: 25px;
+}
+
+.tzs-c50-row .side {
+  grid-template-columns: 190px 1fr;
+}
+
+.tzs-c50-row .role .pay {
+  font-style: normal;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--tzs-grey-2);
+  background: #f1efe9;
+  border-radius: 999px;
+  padding: 1px 10px;
+  margin-left: 10px;
+  vertical-align: 2px;
+}
+
+.tzs-c50-row.head .hcol em {
+  display: block;
+  font-style: normal;
+  font-size: 17px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--tzs-grey-2);
+}
+
+.tzs-c50-row.total .role em {
+  font-style: normal;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--tzs-grey-2);
+  margin-left: 8px;
+}
+
+.tzs-c50-rates {
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--tzs-grey-2);
+}
+
+.tzs-c50-hero .line1 {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.tzs-c50-hero .line1 .saving {
+  font-size: 24px;
+  padding: 2px 16px;
+}
+
+.tzs-c50-hero .line1 .saving b {
+  font-size: 32px;
+}
+
+.tzs-c50-hero .cmp {
+  font-size: 30px;
+}
+
+.tzs-c50-row {
+  font-size: 24px;
+  line-height: 1.06;
+  padding: 1px 0;
+}
+
+.tzs-c50-row.agents .role {
+  font-size: 22px;
+}
+
+.tzs-c50-row.agents .role em {
+  display: inline;
+  margin-left: 10px;
+  font-size: 18px;
+}
+
+.tzs-c50-row.total {
+  font-size: 34px;
+}
+
+.tzs-c50-row.total .side {
+  grid-template-columns: 70px 1fr;
+}
+
+.tzs-c50-row.total .vnd {
+  font-size: 30px;
+  white-space: nowrap;
+}
+
+.tzs-c50-group .gtitle {
+  font-size: 18px;
+  margin: 0;
+}
